@@ -646,9 +646,11 @@ function atualizarTelaHome() {
           <span class="empty-state__icon">🍬</span>
           <h3>Nenhum cliente por aqui ainda</h3>
           <p>Cadastre o primeiro cliente para começar a organizar sua doceria.</p>
-          <button class="btn btn--primary" data-abrir-form="novo" type="button">Cadastrar cliente</button>
+          <button class="btn btn--primary" data-abrir-form="novo" data-admin-only type="button">Cadastrar cliente</button>
         </div>`;
-        container.querySelector('[data-abrir-form="novo"]').addEventListener('click', () => abrirFormulario('novo'));
+        const botaoNovoCliente = container.querySelector('[data-abrir-form="novo"]');
+        botaoNovoCliente.hidden = estado.papelUsuario !== 'admin';
+        botaoNovoCliente.addEventListener('click', () => abrirFormulario('novo'));
       return;
     }
 
@@ -666,8 +668,9 @@ function criarCardRecente(cliente) {
       <div class="client-card__nome">${escaparHtml(cliente.nome)}</div>
       <a class="client-card__celular" href="tel:${apenasNumeros(cliente.celular)}">${escaparHtml(cliente.celular)}</a>
     </div>
-    <button class="client-card__editar" type="button">Editar</button>
+    <button class="client-card__editar" data-admin-only type="button">Editar</button>
   `;
+  card.querySelector('.client-card__editar').hidden = estado.papelUsuario !== 'admin';
   card.addEventListener('click', () => abrirDetalheCliente(cliente));
   card.querySelector('.client-card__celular').addEventListener('click', (evento) => evento.stopPropagation());
   card.querySelector('.client-card__editar').addEventListener('click', (evento) => {
