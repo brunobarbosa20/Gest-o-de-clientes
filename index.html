@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Doce Gestão</title>
+<meta name="description" content="Doce Gestão — cadastro e organização de clientes da sua doceria.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<section class="login-screen" id="login-screen" aria-labelledby="login-titulo">
+  <div class="login-panel">
+    <div class="login__marca">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <span class="brand-name">Doce Gestão</span>
+    </div>
+    <p class="login__eyebrow">Área administrativa</p>
+    <h1 id="login-titulo">Entrar</h1>
+    <p class="login__texto">Acesse sua conta para continuar.</p>
+
+    <form id="form-login" novalidate>
+      <label class="field">
+        <span class="field__label">Usuário</span>
+        <input type="text" id="login-usuario" autocomplete="username" required>
+      </label>
+
+      <label class="field">
+        <span class="field__label">Senha</span>
+        <input type="password" id="login-senha" autocomplete="current-password" required>
+      </label>
+
+      <span class="field__error login__erro" id="erro-login" role="alert"></span>
+      <button class="btn btn--primary btn--block" type="submit">Entrar</button>
+    </form>
+  </div>
+</section>
+
+<div class="app" id="app" hidden>
+
+  <!-- Navegação: barra inferior no celular, coluna lateral no computador -->
+  <nav class="nav" id="nav" aria-label="Navegação principal">
+    <div class="nav__brand">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <span class="brand-name">Doce Gestão</span>
+    </div>
+
+    <div class="nav__items">
+      <button class="nav__item is-active" data-screen="home" type="button">
+        <span class="nav__icon" aria-hidden="true">🏠</span>
+        <span class="nav__label">Início</span>
+      </button>
+      <button class="nav__item" data-screen="clients" type="button">
+        <span class="nav__icon" aria-hidden="true">👥</span>
+        <span class="nav__label">Clientes</span>
+      </button>
+      <button class="nav__item" data-screen="sweets" type="button">
+        <span class="nav__icon" aria-hidden="true">🧁</span>
+        <span class="nav__label">Doces</span>
+      </button>
+      <button class="nav__item nav__item--accent" data-abrir-form="novo" type="button">
+        <span class="nav__icon" aria-hidden="true">➕</span>
+        <span class="nav__label">Novo</span>
+      </button>
+      <button class="nav__item nav__item--logout" id="btn-sair" type="button">
+        <span class="nav__icon" aria-hidden="true">↪</span>
+        <span class="nav__label">Sair</span>
+      </button>
+    </div>
+  </nav>
+
+  <main class="main" id="main">
+
+    <!-- Tela: Início -->
+    <section class="screen is-active" id="screen-home" data-screen="home">
+      <header class="screen__header">
+        <h1>Olá! 👋</h1>
+        <p class="screen__subtitle">Este é o resumo da sua doceria.</p>
+      </header>
+
+      <div class="stats-grid">
+        <div class="stat-card">
+          <span class="stat-card__label">Clientes cadastrados</span>
+          <strong class="stat-card__value" id="stat-total-clientes">0</strong>
+        </div>
+        <div class="stat-card stat-card--acento">
+          <span class="stat-card__label">Total vendido</span>
+          <strong class="stat-card__value" id="stat-total-vendido">R$ 0,00</strong>
+        </div>
+      </div>
+
+      <button class="btn btn--primary btn--block" data-abrir-form="novo" type="button">
+        ➕ Novo cliente
+      </button>
+
+      <div class="section-block">
+        <div class="section-block__header">
+          <h2>Clientes recentes</h2>
+        </div>
+        <div id="lista-recentes" class="recentes-list"></div>
+      </div>
+    </section>
+
+    <!-- Tela: Clientes -->
+    <section class="screen" id="screen-clients" data-screen="clients">
+      <header class="screen__header">
+        <h1>Clientes</h1>
+        <p class="screen__subtitle" id="clients-subtitulo">0 clientes cadastrados</p>
+      </header>
+
+      <label class="search-bar">
+        <span class="search-bar__icon" aria-hidden="true">🔎</span>
+        <input type="search" id="input-busca" placeholder="Buscar por nome ou celular">
+      </label>
+
+      <div class="client-table" id="client-table">
+        <div class="client-row client-row--head" aria-hidden="true">
+          <span>Nome</span>
+          <span>Celular</span>
+          <span>Ações</span>
+        </div>
+        <div id="lista-clientes"></div>
+      </div>
+
+      <div class="empty-state" id="empty-clientes" hidden>
+        <span class="empty-state__icon" aria-hidden="true">🍬</span>
+        <h3>Nenhum cliente por aqui ainda</h3>
+        <p>Cadastre o primeiro cliente para começar a organizar sua doceria.</p>
+        <button class="btn btn--primary" data-abrir-form="novo" type="button">Cadastrar cliente</button>
+      </div>
+
+      <div class="empty-state" id="empty-busca" hidden>
+        <span class="empty-state__icon" aria-hidden="true">🔍</span>
+        <h3>Nenhum cliente encontrado</h3>
+        <p>Tente buscar por outro nome ou número de celular.</p>
+      </div>
+    </section>
+
+    <!-- Tela: catálogo de doces -->
+    <section class="screen" id="screen-sweets" data-screen="sweets">
+      <header class="screen__header screen__header--acao">
+        <div>
+          <h1>Doces</h1>
+          <p class="screen__subtitle" id="sweets-subtitulo">0 doces cadastrados</p>
+        </div>
+        <button class="btn btn--primary btn--pequeno" id="btn-novo-doce" type="button">➕ Novo doce</button>
+      </header>
+
+      <div id="lista-doces" class="doces-list"></div>
+
+      <div class="empty-state" id="empty-doces" hidden>
+        <span class="empty-state__icon" aria-hidden="true">🧁</span>
+        <h3>Nenhum doce cadastrado</h3>
+        <p>Cadastre os doces e preços disponíveis para registrar as compras.</p>
+        <button class="btn btn--primary" id="btn-cadastrar-primeiro-doce" type="button">Cadastrar doce</button>
+      </div>
+    </section>
+
+    <!-- Tela: Formulário -->
+    <section class="screen" id="screen-form" data-screen="form">
+      <header class="screen__header screen__header--form">
+        <button class="btn-icon" id="btn-voltar-form" type="button" aria-label="Voltar">←</button>
+        <h1 id="form-titulo">Novo cliente</h1>
+      </header>
+
+      <form id="form-cliente" novalidate>
+        <input type="hidden" id="cliente-id">
+
+        <label class="field">
+          <span class="field__label">Nome completo</span>
+          <input type="text" id="cliente-nome" name="nome" placeholder="Ex.: Maria da Silva" autocomplete="off">
+          <span class="field__error" id="erro-nome" role="alert"></span>
+        </label>
+
+        <label class="field">
+          <span class="field__label">Celular</span>
+          <input type="tel" id="cliente-celular" name="celular" placeholder="(00) 00000-0000" autocomplete="off" inputmode="numeric" maxlength="16">
+          <span class="field__error" id="erro-celular" role="alert"></span>
+        </label>
+
+        <div class="form-actions">
+          <button type="button" class="btn btn--ghost" id="btn-cancelar-form">Cancelar</button>
+          <button type="submit" class="btn btn--primary">💾 Salvar cliente</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- Tela: formulário de doce -->
+    <section class="screen" id="screen-sweet-form" data-screen="sweet-form">
+      <header class="screen__header screen__header--form">
+        <button class="btn-icon" id="btn-voltar-doce-form" type="button" aria-label="Voltar">←</button>
+        <h1 id="doce-form-titulo">Novo doce</h1>
+      </header>
+
+      <form id="form-doce" novalidate>
+        <input type="hidden" id="doce-id">
+
+        <label class="field">
+          <span class="field__label">Nome do doce</span>
+          <input type="text" id="doce-nome" placeholder="Ex.: Bolo de chocolate" autocomplete="off">
+          <span class="field__error" id="erro-doce-nome" role="alert"></span>
+        </label>
+
+        <label class="field">
+          <span class="field__label">Valor (R$)</span>
+          <input type="number" id="doce-valor" placeholder="0,00" step="0.01" min="0" inputmode="decimal">
+          <span class="field__error" id="erro-doce-valor" role="alert"></span>
+        </label>
+
+        <div class="form-actions">
+          <button type="button" class="btn btn--ghost" id="btn-cancelar-doce-form">Cancelar</button>
+          <button type="submit" class="btn btn--primary">💾 Salvar doce</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- Tela: Detalhe do cliente (perfil + histórico de compras) -->
+    <section class="screen" id="screen-detalhe" data-screen="detalhe">
+      <header class="screen__header screen__header--form">
+        <button class="btn-icon" id="btn-voltar-detalhe" type="button" aria-label="Voltar">←</button>
+        <div>
+          <h1 id="detalhe-nome">Cliente</h1>
+          <p class="screen__subtitle" id="detalhe-celular"></p>
+        </div>
+      </header>
+
+      <div class="stats-grid">
+        <div class="stat-card">
+          <span class="stat-card__label">Total gasto</span>
+          <strong class="stat-card__value" id="detalhe-total-gasto">R$ 0,00</strong>
+        </div>
+        <div class="stat-card stat-card--acento">
+          <span class="stat-card__label">Total pago</span>
+          <strong class="stat-card__value" id="detalhe-total-pago">R$ 0,00</strong>
+        </div>
+        <div class="stat-card stat-card--saldo">
+          <span class="stat-card__label">Falta pagar</span>
+          <strong class="stat-card__value" id="detalhe-saldo-devedor">R$ 0,00</strong>
+        </div>
+        <div class="stat-card stat-card--acento">
+          <span class="stat-card__label">Compras registradas</span>
+          <strong class="stat-card__value" id="detalhe-qtd-compras">0</strong>
+        </div>
+      </div>
+
+      <div class="detalhe-acoes">
+        <button class="btn btn--ghost" id="btn-detalhe-editar" type="button">✏️ Editar cliente</button>
+        <button class="btn btn--danger-outline" id="btn-detalhe-excluir" type="button">🗑️ Excluir cliente</button>
+      </div>
+
+      <div class="section-block">
+        <div class="section-block__header section-block__header--acao">
+          <h2>Compras</h2>
+          <div class="section-block__header-botoes">
+            <button class="btn btn--ghost btn--pequeno" id="btn-registrar-pagamento" type="button" hidden>Registrar pagamento</button>
+            <button class="btn btn--ghost btn--pequeno" id="btn-marcar-todas-pagas" type="button" hidden>✓ Marcar todos pagos</button>
+            <button class="btn btn--primary btn--pequeno" id="btn-nova-compra" type="button">➕ Nova compra</button>
+          </div>
+        </div>
+
+        <div id="lista-compras" class="compras-list"></div>
+
+        <div class="empty-state empty-state--compacto" id="empty-compras" hidden>
+          <span class="empty-state__icon" aria-hidden="true">🧾</span>
+          <h3>Nenhuma compra registrada</h3>
+          <p>Registre a primeira compra desse cliente.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tela: Formulário de compra -->
+    <section class="screen" id="screen-compra-form" data-screen="compra-form">
+      <header class="screen__header screen__header--form">
+        <button class="btn-icon" id="btn-voltar-compra-form" type="button" aria-label="Voltar">←</button>
+        <h1 id="compra-form-titulo">Nova compra</h1>
+      </header>
+
+      <form id="form-compra" novalidate>
+        <input type="hidden" id="compra-id">
+        <input type="hidden" id="compra-cliente-id">
+
+        <div class="field">
+          <label class="field__label" for="compra-doce">Doce</label>
+          <select id="compra-doce">
+            <option value="">Selecione um doce</option>
+          </select>
+          <span class="field__error" id="erro-compra-doce" role="alert"></span>
+          <button type="button" class="btn btn--ghost btn--pequeno" id="btn-cadastrar-doce-compra">➕ Cadastrar doce</button>
+        </div>
+
+        <label class="field">
+          <span class="field__label">Quantidade</span>
+          <input type="number" id="compra-quantidade" value="1" step="1" min="1" inputmode="numeric">
+          <span class="field__error" id="erro-compra-quantidade" role="alert"></span>
+        </label>
+
+        <label class="field">
+          <span class="field__label">Valor total (R$)</span>
+          <input type="number" id="compra-valor" placeholder="Selecione um doce" step="0.01" min="0" readonly>
+          <span class="field__error" id="erro-compra-valor" role="alert"></span>
+        </label>
+
+        <label class="field">
+          <span class="field__label">Data da compra</span>
+          <input type="date" id="compra-data">
+        </label>
+
+        <div class="form-actions">
+          <button type="button" class="btn btn--ghost" id="btn-cancelar-compra-form">Cancelar</button>
+          <button type="submit" class="btn btn--primary">💾 Salvar compra</button>
+        </div>
+      </form>
+    </section>
+
+  </main>
+</div>
+
+<!-- Modal de confirmação de exclusão -->
+<div class="modal-overlay" id="modal-confirm" hidden>
+  <div class="modal" role="alertdialog" aria-modal="true" aria-labelledby="modal-confirm-titulo">
+    <h3 id="modal-confirm-titulo">Excluir cliente?</h3>
+    <p id="modal-confirm-texto">Essa ação não pode ser desfeita.</p>
+    <div class="modal__actions">
+      <button class="btn btn--ghost" id="btn-modal-cancelar" type="button">Cancelar</button>
+      <button class="btn btn--danger" id="btn-modal-confirmar" type="button">Excluir</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal de registro de pagamento -->
+<div class="modal-overlay" id="modal-pagamento" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-pagamento-titulo">
+    <h3 id="modal-pagamento-titulo">Registrar pagamento</h3>
+    <p id="modal-pagamento-saldo">Saldo em aberto: R$ 0,00</p>
+    <form id="form-pagamento" novalidate>
+      <label class="field">
+        <span class="field__label">Valor recebido (R$)</span>
+        <input type="number" id="pagamento-valor" min="0.01" step="0.01" inputmode="decimal" placeholder="0,00">
+        <span class="field__error" id="erro-pagamento-valor" role="alert"></span>
+      </label>
+      <div class="modal__actions">
+        <button class="btn btn--ghost" id="btn-pagamento-cancelar" type="button">Cancelar</button>
+        <button class="btn btn--primary" type="submit">Registrar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Notificação (toast) -->
+<div class="toast" id="toast" hidden></div>
+
+<script src="js/script.js"></script>
+</body>
+</html>
