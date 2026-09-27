@@ -458,6 +458,7 @@ a { color: var(--cor-primaria); }
 /* ---------- Lista/tabela de clientes ---------- */
 
 .client-row--head { display: none; }
+#client-table > .client-row--head { display: none; }
 
 #lista-clientes { display: flex; flex-direction: column; gap: 10px; }
 
@@ -825,7 +826,7 @@ a { color: var(--cor-primaria); }
   }
 
   /* Tabela de clientes */
-  .client-row--head { display: block; }
+  #client-table > .client-row--head { display: grid; }
 
   .client-row,
   .client-row--head {
