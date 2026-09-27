@@ -663,16 +663,17 @@ function atualizarTelaHome() {
 function criarCardRecente(cliente) {
   const card = document.createElement('div');
   card.className = 'client-card';
+  const celular = cliente.celular?.trim();
   card.innerHTML = `
     <div class="client-card__info">
       <div class="client-card__nome">${escaparHtml(cliente.nome)}</div>
-      <a class="client-card__celular" href="tel:${apenasNumeros(cliente.celular)}">${escaparHtml(cliente.celular)}</a>
+      ${celular ? `<a class="client-card__celular" href="tel:${apenasNumeros(celular)}">${escaparHtml(celular)}</a>` : ''}
     </div>
     <button class="client-card__editar" data-admin-only type="button">Editar</button>
   `;
   card.querySelector('.client-card__editar').hidden = estado.papelUsuario !== 'admin';
   card.addEventListener('click', () => abrirDetalheCliente(cliente));
-  card.querySelector('.client-card__celular').addEventListener('click', (evento) => evento.stopPropagation());
+  card.querySelector('.client-card__celular')?.addEventListener('click', (evento) => evento.stopPropagation());
   card.querySelector('.client-card__editar').addEventListener('click', (evento) => {
     evento.stopPropagation();
     abrirFormulario('editar', cliente, 'clients');
@@ -712,7 +713,7 @@ function renderizarListaFiltrada(todosClientes) {
       if (!termo) return true;
       const nomeCorresponde = cliente.nome.toLowerCase().includes(termo);
       const celularCorresponde = termoNumerico
-        ? apenasNumeros(cliente.celular).includes(termoNumerico)
+        ? apenasNumeros(cliente.celular || '').includes(termoNumerico)
         : false;
       return nomeCorresponde || celularCorresponde;
     })
@@ -733,9 +734,10 @@ function renderizarListaFiltrada(todosClientes) {
 function criarLinhaCliente(cliente) {
   const linha = document.createElement('div');
   linha.className = 'client-row';
+  const celular = cliente.celular?.trim();
   linha.innerHTML = `
     <div class="client-row__nome">${escaparHtml(cliente.nome)}</div>
-    <a class="client-row__celular" href="tel:${apenasNumeros(cliente.celular)}">📞 ${escaparHtml(cliente.celular)}</a>
+    ${celular ? `<a class="client-row__celular" href="tel:${apenasNumeros(celular)}">📞 ${escaparHtml(celular)}</a>` : ''}
     <div class="client-row__acoes">
       <button class="client-row__acao client-row__acao--editar" type="button">✏️ Editar</button>
       <button class="client-row__acao client-row__acao--excluir" type="button">🗑️ Excluir</button>
@@ -744,7 +746,7 @@ function criarLinhaCliente(cliente) {
 
   linha.querySelector('.client-row__acoes').hidden = estado.papelUsuario !== 'admin';
   linha.addEventListener('click', () => abrirDetalheCliente(cliente));
-  linha.querySelector('.client-row__celular').addEventListener('click', (evento) => evento.stopPropagation());
+  linha.querySelector('.client-row__celular')?.addEventListener('click', (evento) => evento.stopPropagation());
   linha.querySelector('.client-row__acao--editar').addEventListener('click', (evento) => {
     evento.stopPropagation();
     abrirFormulario('editar', cliente, 'clients');
@@ -785,7 +787,7 @@ function validarFormulario(nome, celular) {
   }
 
   const numeros = apenasNumeros(celular);
-  if (numeros.length < 10 || numeros.length > 11) {
+  if (numeros.length > 0 && (numeros.length < 10 || numeros.length > 11)) {
     document.getElementById('erro-celular').textContent = 'Informe um celular válido com DDD.';
     document.getElementById('cliente-celular').classList.add('is-invalido');
     valido = false;
