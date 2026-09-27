@@ -23,8 +23,8 @@
 
     <form id="form-login" novalidate>
       <label class="field">
-        <span class="field__label">Usuário</span>
-        <input type="text" id="login-usuario" autocomplete="username" required>
+        <span class="field__label">E-mail</span>
+        <input type="email" id="login-usuario" autocomplete="email" required>
       </label>
 
       <label class="field">
@@ -351,6 +351,8 @@
 <!-- Notificação (toast) -->
 <div class="toast" id="toast" hidden></div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="js/supabase-config.js"></script>
 <script src="js/script.js"></script>
 </body>
 </html>

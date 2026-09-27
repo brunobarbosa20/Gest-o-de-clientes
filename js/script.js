@@ -1,7 +1,7 @@
 /* ================================================================
    Doce Gestão — script.js
    Organização do arquivo:
-   1. DB      -> camada de dados (hoje: localStorage)
+  1. DB      -> camada de dados (Supabase)
    2. Estado  -> variáveis de controle da tela
    3. Utilitários (máscara de celular, validação, toast)
    4. Navegação entre telas
@@ -13,289 +13,264 @@
 /* ------------------------------------------------------------
    1. CAMADA DE DADOS (DB)
    ------------------------------------------------------------
-   Todas as funções retornam Promises de propósito: assim, no
-   futuro, dá para trocar o corpo de cada método por uma chamada
-   fetch() a uma API/banco de dados real, sem precisar reescrever
-   as telas que consomem esses dados.
-
-   Estrutura pensada para crescer: quando "Compras" e "Histórico
-   de compras" forem criados, basta adicionar uma nova chave
-   (ex.: DB.KEYS.COMPRAS) e novos métodos (listarCompras,
-   salvarCompra...), seguindo o mesmo padrão do módulo Clientes.
+  O acesso ao banco passa pelo cliente autenticado; as políticas
+  RLS do Supabase limitam os registros ao proprietário da sessão.
    ------------------------------------------------------------ */
 
 const DB = {
   KEYS: {
     CLIENTES: 'docegestao_clientes',
-    NEXT_ID: 'docegestao_next_id_cliente',
     COMPRAS: 'docegestao_compras',
-    NEXT_ID_COMPRA: 'docegestao_next_id_compra',
-    DOCES: 'docegestao_doces',
-    NEXT_ID_DOCE: 'docegestao_next_id_doce'
+    DOCES: 'docegestao_doces'
   },
+  clienteSupabase: null,
 
-  _lerLista(chave) {
-    try {
-      const bruto = localStorage.getItem(chave);
-      return bruto ? JSON.parse(bruto) : [];
-    } catch (erro) {
-      console.error('Não foi possível ler os dados salvos:', erro);
-      return [];
+  _supabase() {
+    const configuracao = window.DOCE_GESTAO_SUPABASE_CONFIG;
+    if (!configuracao?.url || !configuracao?.anonKey) {
+      throw new Error('Configure a Project URL e a chave publicável do Supabase em js/supabase-config.js.');
     }
+    if (!window.supabase?.createClient) {
+      throw new Error('Não foi possível carregar o SDK do Supabase. Verifique sua conexão com a internet.');
+    }
+    if (!this.clienteSupabase) {
+      this.clienteSupabase = window.supabase.createClient(configuracao.url, configuracao.anonKey);
+    }
+    return this.clienteSupabase;
   },
 
-  _salvarLista(chave, lista) {
-    localStorage.setItem(chave, JSON.stringify(lista));
+  _validarResposta({ data, error }) {
+    if (error) throw new Error(error.message);
+    return data;
   },
 
-  _gerarProximoId(chaveContador) {
-    const atual = parseInt(localStorage.getItem(chaveContador) || '1', 10);
-    localStorage.setItem(chaveContador, String(atual + 1));
-    return atual;
+  _clienteDaLinha(linha) {
+    return {
+      id: linha.id,
+      nome: linha.name,
+      celular: linha.phone,
+      criadoEm: linha.created_at,
+      atualizadoEm: linha.updated_at
+    };
+  },
+
+  _doceDaLinha(linha) {
+    return { id: linha.id, nome: linha.name, valor: Number(linha.price), criadoEm: linha.created_at };
+  },
+
+  _compraDaLinha(linha) {
+    const valor = Number(linha.total_amount);
+    const valorPago = Number(linha.amount_paid) || 0;
+    return {
+      id: linha.id,
+      clienteId: linha.client_id,
+      doceId: linha.sweet_id,
+      descricao: linha.item_name,
+      quantidade: Number(linha.quantity),
+      valorUnitario: Number(linha.unit_price),
+      valor,
+      data: linha.purchase_date,
+      valorPago,
+      pago: valorPago >= valor,
+      dataPagamento: linha.paid_at,
+      criadoEm: linha.created_at
+    };
+  },
+
+  async migrarDadosLocais() {
+    const cliente = this._supabase();
+    const usuario = this._validarResposta(await cliente.auth.getUser()).user;
+    if (!usuario) throw new Error('Sessão Supabase não encontrada.');
+
+    const statusMigracao = this._validarResposta(await cliente
+      .from('local_migrations').select('owner_id').eq('owner_id', usuario.id).maybeSingle());
+    if (statusMigracao) return false;
+
+    const locais = Object.fromEntries(Object.entries(this.KEYS).map(([nome, chave]) => {
+      try {
+        return [nome, JSON.parse(localStorage.getItem(chave) || '[]')];
+      } catch (erro) {
+        console.warn(`Não foi possível ler os dados locais de ${nome}.`, erro);
+        return [nome, []];
+      }
+    }));
+    const existemDadosLocais = Object.values(locais).some((lista) => lista.length > 0);
+    if (!existemDadosLocais) return false;
+
+    const clientesPorId = new Map();
+    for (const antigo of locais.CLIENTES) {
+      const salvo = this._validarResposta(await cliente.from('clients').upsert({
+        legacy_id: String(antigo.id),
+        name: antigo.nome,
+        phone: antigo.celular,
+        created_at: antigo.criadoEm || new Date().toISOString()
+      }, { onConflict: 'owner_id,legacy_id' }).select('*').single());
+      clientesPorId.set(String(antigo.id), salvo.id);
+    }
+
+    const docesPorId = new Map();
+    for (const antigo of locais.DOCES) {
+      const salvo = this._validarResposta(await cliente.from('sweets').upsert({
+        legacy_id: String(antigo.id),
+        name: antigo.nome,
+        price: antigo.valor,
+        created_at: antigo.criadoEm || new Date().toISOString()
+      }, { onConflict: 'owner_id,legacy_id' }).select('*').single());
+      docesPorId.set(String(antigo.id), salvo.id);
+    }
+
+    for (const antiga of locais.COMPRAS) {
+      const clientId = clientesPorId.get(String(antiga.clienteId));
+      if (!clientId) continue;
+      const quantidade = Number(antiga.quantidade) || 1;
+      const valor = Number(antiga.valor) || 0;
+      const valorPago = Math.min(valor, Math.max(0, Number(antiga.valorPago ?? (antiga.pago ? valor : 0))));
+      this._validarResposta(await cliente.from('purchases').upsert({
+        legacy_id: String(antiga.id),
+        client_id: clientId,
+        sweet_id: docesPorId.get(String(antiga.doceId)) || null,
+        item_name: antiga.descricao,
+        quantity: quantidade,
+        unit_price: Number(antiga.valorUnitario ?? valor / quantidade),
+        total_amount: valor,
+        amount_paid: valorPago,
+        purchase_date: antiga.data,
+        paid_at: valorPago >= valor ? antiga.dataPagamento || null : null,
+        created_at: antiga.criadoEm || new Date().toISOString()
+      }, { onConflict: 'owner_id,legacy_id' }));
+    }
+
+    this._validarResposta(await cliente.from('local_migrations').insert({ owner_id: usuario.id }));
+    return locais.CLIENTES.length > 0;
   },
 
   // ---------- Clientes ----------
 
-  listarClientes() {
-    return Promise.resolve(this._lerLista(this.KEYS.CLIENTES));
+  async listarClientes() {
+    const data = this._validarResposta(await this._supabase().from('clients').select('*').order('name'));
+    return data.map((linha) => this._clienteDaLinha(linha));
   },
 
-  buscarClientePorId(id) {
-    const clientes = this._lerLista(this.KEYS.CLIENTES);
-    return Promise.resolve(clientes.find((c) => c.id === id) || null);
+  async buscarClientePorId(id) {
+    const data = this._validarResposta(await this._supabase().from('clients').select('*').eq('id', id).maybeSingle());
+    return data ? this._clienteDaLinha(data) : null;
   },
 
-  salvarCliente(dadosCliente) {
-    const clientes = this._lerLista(this.KEYS.CLIENTES);
-
+  async salvarCliente(dadosCliente) {
+    const cliente = this._supabase();
+    const dados = { name: dadosCliente.nome, phone: dadosCliente.celular, updated_at: new Date().toISOString() };
     if (dadosCliente.id) {
-      // Edição
-      const indice = clientes.findIndex((c) => c.id === dadosCliente.id);
-      if (indice === -1) return Promise.reject(new Error('Cliente não encontrado.'));
-      clientes[indice] = {
-        ...clientes[indice],
-        nome: dadosCliente.nome,
-        celular: dadosCliente.celular,
-        atualizadoEm: new Date().toISOString()
-      };
-      this._salvarLista(this.KEYS.CLIENTES, clientes);
-      return Promise.resolve(clientes[indice]);
+      const data = this._validarResposta(await cliente.from('clients').update(dados).eq('id', dadosCliente.id).select('*').single());
+      return this._clienteDaLinha(data);
     }
-
-    // Cadastro novo
-    const novoCliente = {
-      id: this._gerarProximoId(this.KEYS.NEXT_ID),
-      nome: dadosCliente.nome,
-      celular: dadosCliente.celular,
-      criadoEm: new Date().toISOString()
-      // Campo que poderá ser usado por uma futura indicação automática
-      // de "próxima compra prevista": previsaoProximaCompraEm: null
-    };
-    clientes.push(novoCliente);
-    this._salvarLista(this.KEYS.CLIENTES, clientes);
-    return Promise.resolve(novoCliente);
+    const data = this._validarResposta(await cliente.from('clients').insert({ ...dados, created_at: new Date().toISOString() }).select('*').single());
+    return this._clienteDaLinha(data);
   },
 
-  excluirCliente(id) {
-    const clientes = this._lerLista(this.KEYS.CLIENTES);
-    const restantes = clientes.filter((c) => c.id !== id);
-    this._salvarLista(this.KEYS.CLIENTES, restantes);
-    // Ao excluir o cliente, as compras dele também são removidas.
-    return this.excluirComprasDoCliente(id).then(() => true);
+  async excluirCliente(id) {
+    this._validarResposta(await this._supabase().from('clients').delete().eq('id', id));
+    return true;
   },
 
   // ---------- Compras ----------
-  // Cada compra pertence a um cliente (clienteId). É esse vínculo que
-  // permite montar o histórico de compras e, futuramente, calcular
-  // quando o cliente poderá fazer uma nova compra.
 
-  listarCompras() {
-    return Promise.resolve(this._lerLista(this.KEYS.COMPRAS));
+  async listarCompras() {
+    const data = this._validarResposta(await this._supabase().from('purchases').select('*'));
+    return data.map((linha) => this._compraDaLinha(linha));
   },
 
-  listarComprasPorCliente(clienteId) {
-    const compras = this._lerLista(this.KEYS.COMPRAS).filter((c) => c.clienteId === clienteId);
-    return Promise.resolve(compras);
+  async listarComprasPorCliente(clienteId) {
+    const data = this._validarResposta(await this._supabase().from('purchases').select('*')
+      .eq('client_id', clienteId).order('purchase_date').order('created_at'));
+    return data.map((linha) => this._compraDaLinha(linha));
   },
 
-  salvarCompra(dadosCompra) {
-    const compras = this._lerLista(this.KEYS.COMPRAS);
-
+  async salvarCompra(dadosCompra) {
+    const cliente = this._supabase();
+    const dados = {
+      client_id: dadosCompra.clienteId,
+      sweet_id: dadosCompra.doceId || null,
+      item_name: dadosCompra.descricao,
+      quantity: dadosCompra.quantidade,
+      unit_price: dadosCompra.valorUnitario,
+      total_amount: dadosCompra.valor,
+      purchase_date: dadosCompra.data
+    };
     if (dadosCompra.id) {
-      // Edição
-      const indice = compras.findIndex((c) => c.id === dadosCompra.id);
-      if (indice === -1) return Promise.reject(new Error('Compra não encontrada.'));
-      const valorPago = Math.min(obterValorPagoCompra(compras[indice]), Number(dadosCompra.valor));
+      const existente = this._validarResposta(await cliente.from('purchases').select('amount_paid,paid_at')
+        .eq('id', dadosCompra.id).single());
+      const valorPago = Math.min(Number(existente.amount_paid), Number(dadosCompra.valor));
       const estaPaga = valorPago >= Number(dadosCompra.valor);
-      compras[indice] = {
-        ...compras[indice],
-        doceId: dadosCompra.doceId,
-        descricao: dadosCompra.descricao,
-        quantidade: dadosCompra.quantidade,
-        valorUnitario: dadosCompra.valorUnitario,
-        valor: dadosCompra.valor,
-        data: dadosCompra.data,
-        valorPago,
-        pago: estaPaga,
-        dataPagamento: estaPaga ? compras[indice].dataPagamento || obterDataLocalISO() : null
-      };
-      this._salvarLista(this.KEYS.COMPRAS, compras);
-      return Promise.resolve(compras[indice]);
+      const data = this._validarResposta(await cliente.from('purchases').update({
+        ...dados,
+        amount_paid: valorPago,
+        paid_at: estaPaga ? existente.paid_at || obterDataLocalISO() : null
+      }).eq('id', dadosCompra.id).select('*').single());
+      return this._compraDaLinha(data);
     }
-
-    // Cadastro novo
-    const novaCompra = {
-      id: this._gerarProximoId(this.KEYS.NEXT_ID_COMPRA),
-      clienteId: dadosCompra.clienteId,
-      doceId: dadosCompra.doceId,
-      descricao: dadosCompra.descricao,
-      quantidade: dadosCompra.quantidade,
-      valorUnitario: dadosCompra.valorUnitario,
-      valor: dadosCompra.valor,
-      data: dadosCompra.data,
-      valorPago: 0,
-      pago: false,
-      dataPagamento: null,
-      criadoEm: new Date().toISOString()
-    };
-    compras.push(novaCompra);
-    this._salvarLista(this.KEYS.COMPRAS, compras);
-    return Promise.resolve(novaCompra);
+    const data = this._validarResposta(await cliente.from('purchases').insert(dados).select('*').single());
+    return this._compraDaLinha(data);
   },
 
-  atualizarPagamentoCompra(id, pago) {
-    const compras = this._lerLista(this.KEYS.COMPRAS);
-    const indice = compras.findIndex((compra) => compra.id === id);
-    if (indice === -1) return Promise.reject(new Error('Compra não encontrada.'));
-
-    compras[indice] = {
-      ...compras[indice],
-      pago,
-      valorPago: pago ? Number(compras[indice].valor) : 0,
-      dataPagamento: pago ? obterDataLocalISO() : null
-    };
-    this._salvarLista(this.KEYS.COMPRAS, compras);
-    return Promise.resolve(compras[indice]);
+  async atualizarPagamentoCompra(id, pago) {
+    const cliente = this._supabase();
+    const existente = this._validarResposta(await cliente.from('purchases').select('total_amount')
+      .eq('id', id).single());
+    const data = this._validarResposta(await cliente.from('purchases').update({
+      amount_paid: pago ? Number(existente.total_amount) : 0,
+      paid_at: pago ? obterDataLocalISO() : null
+    }).eq('id', id).select('*').single());
+    return this._compraDaLinha(data);
   },
 
-  marcarComprasDoClienteComoPagas(clienteId) {
-    const compras = this._lerLista(this.KEYS.COMPRAS);
-    const dataPagamento = obterDataLocalISO();
-    let atualizadas = 0;
-    const comprasAtualizadas = compras.map((compra) => {
-      if (compra.clienteId !== clienteId || compra.pago) return compra;
-      atualizadas += 1;
-      return { ...compra, valorPago: Number(compra.valor), pago: true, dataPagamento };
-    });
-
-    if (atualizadas > 0) this._salvarLista(this.KEYS.COMPRAS, comprasAtualizadas);
-    return Promise.resolve(atualizadas);
+  async marcarComprasDoClienteComoPagas(clienteId) {
+    return this._validarResposta(await this._supabase().rpc('mark_client_purchases_paid', {
+      p_client_id: clienteId,
+      p_paid_at: obterDataLocalISO()
+    }));
   },
 
-  registrarPagamentoCliente(clienteId, valor) {
-    const compras = this._lerLista(this.KEYS.COMPRAS);
-    const comprasDoCliente = compras
-      .filter((compra) => compra.clienteId === clienteId)
-      .sort((a, b) => a.data.localeCompare(b.data) || a.id - b.id);
-    const valorPagamentoCentavos = paraCentavos(valor);
-    const saldoInicialCentavos = comprasDoCliente.reduce((saldo, compra) => {
-      return saldo + paraCentavos(compra.valor) - paraCentavos(obterValorPagoCompra(compra));
-    }, 0);
-
-    if (valorPagamentoCentavos <= 0) {
-      return Promise.reject(new Error('Informe um valor de pagamento maior que zero.'));
-    }
-    if (valorPagamentoCentavos > saldoInicialCentavos) {
-      return Promise.reject(new Error('O pagamento não pode ser maior que o saldo em aberto.'));
-    }
-
-    let restanteCentavos = valorPagamentoCentavos;
-    const dataPagamento = obterDataLocalISO();
-    const atualizadasPorId = new Map();
-
-    comprasDoCliente.forEach((compra) => {
-      const totalCentavos = paraCentavos(compra.valor);
-      const pagoAntesCentavos = paraCentavos(obterValorPagoCompra(compra));
-      const aplicadoCentavos = Math.min(totalCentavos - pagoAntesCentavos, restanteCentavos);
-      const valorPagoCentavos = pagoAntesCentavos + aplicadoCentavos;
-      const estaPaga = valorPagoCentavos >= totalCentavos;
-
-      if (aplicadoCentavos > 0 || compra.valorPago === undefined) {
-        atualizadasPorId.set(compra.id, {
-          ...compra,
-          valorPago: valorPagoCentavos / 100,
-          pago: estaPaga,
-          dataPagamento: estaPaga ? compra.dataPagamento || dataPagamento : null
-        });
-      }
-      restanteCentavos -= aplicadoCentavos;
-    });
-
-    const comprasAtualizadas = compras.map((compra) => atualizadasPorId.get(compra.id) || compra);
-    this._salvarLista(this.KEYS.COMPRAS, comprasAtualizadas);
-    return Promise.resolve({
-      valorPago: valorPagamentoCentavos / 100,
-      saldoDevedor: (saldoInicialCentavos - valorPagamentoCentavos) / 100
-    });
+  async registrarPagamentoCliente(clienteId, valor) {
+    const data = this._validarResposta(await this._supabase().rpc('register_client_payment', {
+      p_client_id: clienteId,
+      p_amount: valor,
+      p_paid_at: obterDataLocalISO()
+    }));
+    return { valorPago: Number(data.applied), saldoDevedor: Number(data.balance) };
   },
 
-  excluirCompra(id) {
-    const compras = this._lerLista(this.KEYS.COMPRAS);
-    const restantes = compras.filter((c) => c.id !== id);
-    this._salvarLista(this.KEYS.COMPRAS, restantes);
-    return Promise.resolve(true);
+  async excluirCompra(id) {
+    this._validarResposta(await this._supabase().from('purchases').delete().eq('id', id));
+    return true;
   },
 
-  excluirComprasDoCliente(clienteId) {
-    const compras = this._lerLista(this.KEYS.COMPRAS);
-    const restantes = compras.filter((c) => c.clienteId !== clienteId);
-    this._salvarLista(this.KEYS.COMPRAS, restantes);
-    return Promise.resolve(true);
+  async excluirComprasDoCliente(clienteId) {
+    this._validarResposta(await this._supabase().from('purchases').delete().eq('client_id', clienteId));
+    return true;
   },
 
   // ---------- Catálogo de doces ----------
 
-  listarDoces() {
-    return Promise.resolve(this._lerLista(this.KEYS.DOCES));
+  async listarDoces() {
+    const data = this._validarResposta(await this._supabase().from('sweets').select('*').order('name'));
+    return data.map((linha) => this._doceDaLinha(linha));
   },
 
-  salvarDoce(dadosDoce) {
-    const doces = this._lerLista(this.KEYS.DOCES);
-
+  async salvarDoce(dadosDoce) {
+    const cliente = this._supabase();
+    const dados = { name: dadosDoce.nome, price: dadosDoce.valor };
     if (dadosDoce.id) {
-      const indice = doces.findIndex((doce) => doce.id === dadosDoce.id);
-      if (indice === -1) return Promise.reject(new Error('Doce não encontrado.'));
-      doces[indice] = {
-        ...doces[indice],
-        nome: dadosDoce.nome,
-        valor: dadosDoce.valor
-      };
-      this._salvarLista(this.KEYS.DOCES, doces);
-      return Promise.resolve(doces[indice]);
+      const data = this._validarResposta(await cliente.from('sweets').update(dados).eq('id', dadosDoce.id).select('*').single());
+      return this._doceDaLinha(data);
     }
-
-    const novoDoce = {
-      id: this._gerarProximoId(this.KEYS.NEXT_ID_DOCE),
-      nome: dadosDoce.nome,
-      valor: dadosDoce.valor,
-      criadoEm: new Date().toISOString()
-    };
-    doces.push(novoDoce);
-    this._salvarLista(this.KEYS.DOCES, doces);
-    return Promise.resolve(novoDoce);
+    const data = this._validarResposta(await cliente.from('sweets').insert(dados).select('*').single());
+    return this._doceDaLinha(data);
   },
 
-  excluirDoce(id) {
-    const doces = this._lerLista(this.KEYS.DOCES);
-    this._salvarLista(this.KEYS.DOCES, doces.filter((doce) => doce.id !== id));
-    return Promise.resolve(true);
+  async excluirDoce(id) {
+    this._validarResposta(await this._supabase().from('sweets').delete().eq('id', id));
+    return true;
   }
-};
-
-const CREDENCIAIS_LOGIN = {
-  usuario: 'Beatriz',
-  senha: 'meumaridolindo',
-  chaveSessao: 'docegestao_sessao_autenticada'
 };
 
 /* ------------------------------------------------------------
@@ -355,78 +330,97 @@ function formatarMoeda(valor) {
   return (Number(valor) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
-function credenciaisValidas(usuario, senha) {
-  return usuario.trim().toLowerCase() === CREDENCIAIS_LOGIN.usuario.toLowerCase()
-    && senha === CREDENCIAIS_LOGIN.senha;
-}
-
-function entrarNoSistema() {
+async function entrarNoSistema(usuario) {
+  const metadados = usuario.user_metadata || {};
+  estado.nomeUsuario = metadados.display_name || metadados.name || usuario.email?.split('@')[0] || 'Usuário';
   document.getElementById('login-screen').hidden = true;
   document.getElementById('app').hidden = false;
   document.getElementById('erro-login').textContent = '';
-  document.getElementById('home-saudacao').textContent = `Olá, ${estado.nomeUsuario || CREDENCIAIS_LOGIN.usuario}!`;
+  document.getElementById('home-saudacao').textContent = `Olá, ${estado.nomeUsuario}!`;
 
   if (!estado.aplicacaoIniciada) {
     estado.aplicacaoIniciada = true;
+    let dadosMigrados = false;
+    let erroMigracao = null;
+    try {
+      dadosMigrados = await DB.migrarDadosLocais();
+    } catch (erro) {
+      erroMigracao = erro;
+      console.error('Falha ao migrar dados locais para o Supabase:', erro);
+    }
     iniciar();
+    if (dadosMigrados) mostrarToast('Dados locais importados para o Supabase.');
+    if (erroMigracao) mostrarToast('Não foi possível concluir a importação dos dados locais.', 'erro');
   } else {
     irParaTela('home');
   }
 }
 
-function sairDoSistema() {
+async function sairDoSistema() {
   try {
-    sessionStorage.removeItem(CREDENCIAIS_LOGIN.chaveSessao);
+    const { error } = await DB._supabase().auth.signOut();
+    if (error) throw error;
   } catch (erro) {
-    console.warn('Não foi possível encerrar a sessão do navegador.', erro);
+    mostrarToast('Não foi possível encerrar a sessão.', 'erro');
+    console.error(erro);
+    return;
   }
 
   document.getElementById('app').hidden = true;
   document.getElementById('login-screen').hidden = false;
   document.getElementById('login-senha').value = '';
+  document.getElementById('login-usuario').value = '';
   document.getElementById('login-usuario').focus({ preventScroll: true });
 }
 
 function iniciarAutenticacao() {
-  document.getElementById('form-login').addEventListener('submit', (evento) => {
+  const formulario = document.getElementById('form-login');
+  const erroLogin = document.getElementById('erro-login');
+
+  if (!window.DOCE_GESTAO_SUPABASE_CONFIG?.url || !window.DOCE_GESTAO_SUPABASE_CONFIG?.anonKey) {
+    erroLogin.textContent = 'Configure a URL e a chave publicável do Supabase em js/supabase-config.js.';
+  }
+
+  formulario.addEventListener('submit', async (evento) => {
     evento.preventDefault();
-    const usuario = document.getElementById('login-usuario').value;
+    const email = document.getElementById('login-usuario').value.trim();
     const senha = document.getElementById('login-senha').value;
-
-    if (!credenciaisValidas(usuario, senha)) {
-      document.getElementById('erro-login').textContent = 'Usuário ou senha inválidos.';
-      document.getElementById('login-senha').value = '';
-      document.getElementById('login-senha').focus({ preventScroll: true });
-      return;
-    }
-
-    const nomeDigitado = usuario.trim();
-    estado.nomeUsuario = nomeDigitado.toLowerCase() === CREDENCIAIS_LOGIN.usuario.toLowerCase()
-      ? CREDENCIAIS_LOGIN.usuario
-      : nomeDigitado;
+    const botaoEnviar = formulario.querySelector('[type="submit"]');
+    botaoEnviar.disabled = true;
+    erroLogin.textContent = '';
 
     try {
-      sessionStorage.setItem(CREDENCIAIS_LOGIN.chaveSessao, estado.nomeUsuario);
+      const { data, error } = await DB._supabase().auth.signInWithPassword({ email, password: senha });
+      if (error) throw error;
+      await entrarNoSistema(data.user);
     } catch (erro) {
-      console.warn('A sessão ficará ativa somente até esta página ser fechada.', erro);
+      erroLogin.textContent = erro.message?.includes('Invalid login credentials')
+        ? 'E-mail ou senha incorretos.'
+        : erro.message || 'Não foi possível conectar ao Supabase.';
+      document.getElementById('login-senha').value = '';
+      document.getElementById('login-senha').focus({ preventScroll: true });
+    } finally {
+      botaoEnviar.disabled = false;
     }
-    entrarNoSistema();
   });
 
   document.getElementById('btn-sair').addEventListener('click', sairDoSistema);
 
-  let usuarioSessao = '';
+  let clienteSupabase;
   try {
-    usuarioSessao = sessionStorage.getItem(CREDENCIAIS_LOGIN.chaveSessao) || '';
+    clienteSupabase = DB._supabase();
   } catch (erro) {
-    console.warn('Não foi possível recuperar a sessão do navegador.', erro);
+    erroLogin.textContent = erro.message;
+    return;
   }
 
-  if (usuarioSessao) {
-    estado.nomeUsuario = usuarioSessao === 'true' ? CREDENCIAIS_LOGIN.usuario : usuarioSessao;
-    entrarNoSistema();
-  }
-  else document.getElementById('login-usuario').focus({ preventScroll: true });
+  clienteSupabase.auth.getSession().then(({ data, error }) => {
+    if (error) throw error;
+    if (data.session?.user) entrarNoSistema(data.session.user);
+    else document.getElementById('login-usuario').focus({ preventScroll: true });
+  }).catch((erro) => {
+    erroLogin.textContent = erro.message || 'Não foi possível verificar a sessão do Supabase.';
+  });
 }
 
 function paraCentavos(valor) {
@@ -714,7 +708,7 @@ function criarLinhaCliente(cliente) {
   const linha = document.createElement('div');
   linha.className = 'client-row';
   linha.innerHTML = `
-    <div class="client-row__nome">${escaparHtml(cliente.nome)} <span class="client-row__id">#${cliente.id}</span></div>
+    <div class="client-row__nome">${escaparHtml(cliente.nome)}</div>
     <a class="client-row__celular" href="tel:${apenasNumeros(cliente.celular)}">📞 ${escaparHtml(cliente.celular)}</a>
     <div class="client-row__acoes">
       <button class="client-row__acao client-row__acao--editar" type="button">✏️ Editar</button>
@@ -1068,12 +1062,12 @@ function tratarEnvioFormularioCompra(evento) {
   if (!validarFormularioCompra(seletorDoce.value, quantidade, valor)) return;
 
   const doceId = opcaoDoce.dataset.tipo === 'historico'
-    ? (opcaoDoce.dataset.doceId ? Number(opcaoDoce.dataset.doceId) : null)
-    : Number(opcaoDoce.value);
+    ? (opcaoDoce.dataset.doceId || null)
+    : opcaoDoce.value;
 
   const dados = {
     id: estado.compraIdEmEdicao,
-    clienteId: Number(document.getElementById('compra-cliente-id').value),
+    clienteId: document.getElementById('compra-cliente-id').value,
     doceId,
     descricao: descricao.trim(),
     quantidade,
