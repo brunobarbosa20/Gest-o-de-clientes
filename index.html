@@ -47,7 +47,13 @@
       <span class="brand-name">Doce Gestão</span>
     </div>
 
-    <div class="nav__items">
+    <button class="nav__toggle" id="nav-toggle" type="button" aria-label="Abrir menu" aria-controls="nav-items" aria-expanded="false">
+      <span></span>
+      <span></span>
+      <span></span>
+    </button>
+
+    <div class="nav__items" id="nav-items" aria-hidden="true" inert>
       <button class="nav__item is-active" data-screen="home" type="button">
         <span class="nav__icon" aria-hidden="true">🏠</span>
         <span class="nav__label">Início</span>
@@ -334,7 +340,7 @@
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-pagamento-titulo">
     <h3 id="modal-pagamento-titulo">Registrar pagamento</h3>
     <p id="modal-pagamento-saldo">Saldo em aberto: R$ 0,00</p>
-    <form id="form-pagamento" data-admin-only novalidate>
+    <form id="form-pagamento" data-iadmin-only novalidate>
       <label class="field">
         <span class="field__label">Valor recebido (R$)</span>
         <input type="number" id="pagamento-valor" min="0.01" step="0.01" inputmode="decimal" placeholder="0,00">

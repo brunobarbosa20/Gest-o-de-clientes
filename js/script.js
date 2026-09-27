@@ -494,6 +494,35 @@ function irParaTela(nomeTela) {
   document.getElementById('main').scrollTo({ top: 0 });
 }
 
+function definirMenuAberto(aberto, devolverFoco = false) {
+  const botao = document.getElementById('nav-toggle');
+  const itens = document.getElementById('nav-items');
+  if (!botao || !itens) return;
+
+  botao.setAttribute('aria-expanded', String(aberto));
+  botao.setAttribute('aria-label', aberto ? 'Fechar menu' : 'Abrir menu');
+  itens.classList.toggle('is-open', aberto);
+  itens.setAttribute('aria-hidden', String(!aberto));
+  itens.inert = !aberto;
+
+  if (devolverFoco) botao.focus();
+}
+
+function sincronizarMenuComTela() {
+  const itens = document.getElementById('nav-items');
+  if (!itens) return;
+
+  const menuDisponivel = window.matchMedia('(min-width: 860px)').matches;
+  if (menuDisponivel) {
+    itens.classList.remove('is-open');
+    itens.setAttribute('aria-hidden', 'false');
+    itens.inert = false;
+    document.getElementById('nav-toggle')?.setAttribute('aria-expanded', 'false');
+  } else {
+    definirMenuAberto(false);
+  }
+}
+
 function abrirFormulario(modo, cliente, origem) {
   const formulario = document.getElementById('form-cliente');
   formulario.reset();
@@ -1183,7 +1212,30 @@ function confirmarExclusao() {
    ------------------------------------------------------------ */
 
 function iniciar() {
-  // Navegação (menu inferior / lateral)
+  // Navegação (menu hambúrguer no celular / lateral no computador)
+  const botaoMenu = document.getElementById('nav-toggle');
+  const navegacao = document.getElementById('nav');
+  botaoMenu.addEventListener('click', () => {
+    definirMenuAberto(botaoMenu.getAttribute('aria-expanded') !== 'true');
+  });
+  navegacao.addEventListener('click', (evento) => {
+    if (evento.target.closest('.nav__item') && !window.matchMedia('(min-width: 860px)').matches) {
+      definirMenuAberto(false, true);
+    }
+  });
+  document.addEventListener('click', (evento) => {
+    if (!navegacao.contains(evento.target) && botaoMenu.getAttribute('aria-expanded') === 'true') {
+      definirMenuAberto(false);
+    }
+  });
+  document.addEventListener('keydown', (evento) => {
+    if (evento.key === 'Escape' && botaoMenu.getAttribute('aria-expanded') === 'true') {
+      definirMenuAberto(false, true);
+    }
+  });
+  window.addEventListener('resize', sincronizarMenuComTela);
+  sincronizarMenuComTela();
+
   document.querySelectorAll('.nav__item[data-screen]').forEach((item) => {
     item.addEventListener('click', () => irParaTela(item.dataset.screen));
   });
