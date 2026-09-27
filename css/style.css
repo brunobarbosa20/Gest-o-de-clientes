@@ -395,6 +395,67 @@ a { color: var(--cor-primaria); }
 
 .section-block__header { margin-bottom: 10px; }
 
+.pending-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.pending-header__total {
+  flex-shrink: 0;
+  color: var(--cor-perigo);
+}
+.pending-days {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.pending-day {
+  overflow: hidden;
+  background: var(--cor-superficie);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-peq);
+}
+.pending-day__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--cor-superficie-alt);
+  color: var(--cor-texto-suave);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+.pending-day__header h3 {
+  margin: 0;
+  font-family: var(--fonte-base);
+  font-size: inherit;
+  font-weight: inherit;
+}
+.pending-day__items { padding: 4px 10px; }
+.pending-item {
+  width: 100%;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 4px;
+  text-align: left;
+  border-bottom: 1px solid var(--cor-borda);
+}
+.pending-item:last-child { border-bottom: 0; }
+.pending-item:hover .pending-item__name { color: var(--cor-primaria); }
+.pending-item__name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-weight: 600;
+}
+.pending-item strong {
+  flex-shrink: 0;
+  color: var(--cor-perigo);
+}
+
 /* ---------- Cartões de cliente (Início) ---------- */
 
 .recentes-list { display: flex; flex-direction: column; gap: 10px; }

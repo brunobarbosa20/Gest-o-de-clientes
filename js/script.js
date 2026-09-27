@@ -661,6 +661,7 @@ function atualizarTelaHome() {
 
     const totalItensVendidos = compras.reduce((total, compra) => total + (Number(compra.quantidade) || 1), 0);
     document.getElementById('stat-total-itens-vendidos').textContent = totalItensVendidos.toLocaleString('pt-BR');
+    renderizarPagamentosPendentes(compras, clientes);
 
     const recentes = [...clientes]
       .sort((a, b) => new Date(b.criadoEm) - new Date(a.criadoEm))
@@ -686,6 +687,58 @@ function atualizarTelaHome() {
     recentes.forEach((cliente) => {
       container.appendChild(criarCardRecente(cliente));
     });
+  });
+}
+
+function renderizarPagamentosPendentes(compras, clientes) {
+  const lista = document.getElementById('lista-pagamentos-pendentes');
+  const vazio = document.getElementById('empty-pagamentos-pendentes');
+  const clientePorId = new Map(clientes.map((cliente) => [cliente.id, cliente]));
+  const porData = new Map();
+  let totalPendenteCentavos = 0;
+
+  compras.forEach((compra) => {
+    const valorPendente = Math.max(0, paraCentavos(compra.valor) - paraCentavos(obterValorPagoCompra(compra)));
+    const cliente = clientePorId.get(compra.clienteId);
+    if (valorPendente === 0 || !cliente || !compra.data) return;
+
+    totalPendenteCentavos += valorPendente;
+    if (!porData.has(compra.data)) porData.set(compra.data, new Map());
+
+    const clientesDoDia = porData.get(compra.data);
+    const pendencia = clientesDoDia.get(cliente.id) || { cliente, valorCentavos: 0 };
+    pendencia.valorCentavos += valorPendente;
+    clientesDoDia.set(cliente.id, pendencia);
+  });
+
+  document.getElementById('total-pagamentos-pendentes').textContent = formatarMoeda(totalPendenteCentavos / 100);
+  lista.replaceChildren();
+  vazio.hidden = porData.size !== 0;
+
+  [...porData.entries()].sort(([dataA], [dataB]) => dataB.localeCompare(dataA)).forEach(([data, clientesDoDia]) => {
+    const grupo = document.createElement('section');
+    grupo.className = 'pending-day';
+
+    const pendencias = [...clientesDoDia.values()].sort((a, b) => a.cliente.nome.localeCompare(b.cliente.nome, 'pt-BR'));
+    const totalDoDia = pendencias.reduce((total, pendencia) => total + pendencia.valorCentavos, 0);
+    const cabecalho = document.createElement('div');
+    cabecalho.className = 'pending-day__header';
+    cabecalho.innerHTML = `<h3>${formatarDataResumo(data)}</h3><span>${formatarMoeda(totalDoDia / 100)}</span>`;
+
+    const itens = document.createElement('div');
+    itens.className = 'pending-day__items';
+    pendencias.forEach(({ cliente, valorCentavos }) => {
+      const item = document.createElement('button');
+      item.className = 'pending-item';
+      item.type = 'button';
+      item.setAttribute('aria-label', `${cliente.nome}, saldo pendente ${formatarMoeda(valorCentavos / 100)}. Abrir dados do cliente.`);
+      item.innerHTML = `<span class="pending-item__name">${escaparHtml(cliente.nome)}</span><strong>${formatarMoeda(valorCentavos / 100)}</strong>`;
+      item.addEventListener('click', () => abrirDetalheCliente(cliente));
+      itens.appendChild(item);
+    });
+
+    grupo.append(cabecalho, itens);
+    lista.appendChild(grupo);
   });
 }
 
