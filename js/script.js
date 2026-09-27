@@ -659,8 +659,8 @@ function atualizarTelaHome() {
   Promise.all([DB.listarClientes(), DB.listarCompras()]).then(([clientes, compras]) => {
     document.getElementById('stat-total-clientes').textContent = clientes.length;
 
-    const totalVendido = compras.reduce((soma, c) => soma + Number(c.valor || 0), 0);
-    document.getElementById('stat-total-vendido').textContent = formatarMoeda(totalVendido);
+    const totalItensVendidos = compras.reduce((total, compra) => total + (Number(compra.quantidade) || 1), 0);
+    document.getElementById('stat-total-itens-vendidos').textContent = totalItensVendidos.toLocaleString('pt-BR');
 
     const recentes = [...clientes]
       .sort((a, b) => new Date(b.criadoEm) - new Date(a.criadoEm))
