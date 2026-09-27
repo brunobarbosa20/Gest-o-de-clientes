@@ -311,6 +311,7 @@ const estado = {
   compraIdEmEdicao: null,       // compra em edição (null = cadastro novo)
   doceIdEmEdicao: null,
   origemFormularioDoce: 'sweets',
+  nomeUsuario: '',
   aplicacaoIniciada: false,
   exclusao: null                // { tipo: 'cliente' | 'compra', id }
 };
@@ -363,6 +364,7 @@ function entrarNoSistema() {
   document.getElementById('login-screen').hidden = true;
   document.getElementById('app').hidden = false;
   document.getElementById('erro-login').textContent = '';
+  document.getElementById('home-saudacao').textContent = `Olá, ${estado.nomeUsuario || CREDENCIAIS_LOGIN.usuario}!`;
 
   if (!estado.aplicacaoIniciada) {
     estado.aplicacaoIniciada = true;
@@ -398,8 +400,13 @@ function iniciarAutenticacao() {
       return;
     }
 
+    const nomeDigitado = usuario.trim();
+    estado.nomeUsuario = nomeDigitado.toLowerCase() === CREDENCIAIS_LOGIN.usuario.toLowerCase()
+      ? CREDENCIAIS_LOGIN.usuario
+      : nomeDigitado;
+
     try {
-      sessionStorage.setItem(CREDENCIAIS_LOGIN.chaveSessao, 'true');
+      sessionStorage.setItem(CREDENCIAIS_LOGIN.chaveSessao, estado.nomeUsuario);
     } catch (erro) {
       console.warn('A sessão ficará ativa somente até esta página ser fechada.', erro);
     }
@@ -408,14 +415,17 @@ function iniciarAutenticacao() {
 
   document.getElementById('btn-sair').addEventListener('click', sairDoSistema);
 
-  let sessaoValida = false;
+  let usuarioSessao = '';
   try {
-    sessaoValida = sessionStorage.getItem(CREDENCIAIS_LOGIN.chaveSessao) === 'true';
+    usuarioSessao = sessionStorage.getItem(CREDENCIAIS_LOGIN.chaveSessao) || '';
   } catch (erro) {
     console.warn('Não foi possível recuperar a sessão do navegador.', erro);
   }
 
-  if (sessaoValida) entrarNoSistema();
+  if (usuarioSessao) {
+    estado.nomeUsuario = usuarioSessao === 'true' ? CREDENCIAIS_LOGIN.usuario : usuarioSessao;
+    entrarNoSistema();
+  }
   else document.getElementById('login-usuario').focus({ preventScroll: true });
 }
 
