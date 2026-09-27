@@ -501,6 +501,7 @@ a { color: var(--cor-primaria); }
   gap: 6px;
 }
 .client-row__acao--editar { background: var(--cor-superficie-alt); color: var(--cor-primaria); }
+.client-row__acao--compra { background: var(--cor-acento-clara); color: var(--cor-texto); }
 .client-row__acao--excluir { background: var(--cor-perigo-clara); color: var(--cor-perigo); }
 
 /* ---------- Detalhe do cliente ---------- */
@@ -846,8 +847,8 @@ a { color: var(--cor-primaria); }
   #lista-clientes { gap: 0; }
   .client-row:last-child { border-bottom: none; }
 
-  .client-row__acoes { margin-top: 0; }
-  .client-row__acao { flex: none; padding: 8px 14px; }
+  .client-row__acoes { margin-top: 0; flex-wrap: wrap; }
+  .client-row__acao { flex: 1 1 auto; padding: 8px; }
 
   .toast { left: auto; right: 32px; bottom: 32px; max-width: 320px; }
 

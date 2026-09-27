@@ -768,6 +768,7 @@ function criarLinhaCliente(cliente) {
     <div class="client-row__nome">${escaparHtml(cliente.nome)}</div>
     ${celular ? `<a class="client-row__celular" href="tel:${apenasNumeros(celular)}">📞 ${escaparHtml(celular)}</a>` : '<span class="client-row__celular">Número não informado</span>'}
     <div class="client-row__acoes">
+      <button class="client-row__acao client-row__acao--compra" type="button">➕ Nova compra</button>
       <button class="client-row__acao client-row__acao--editar" type="button">✏️ Editar</button>
       <button class="client-row__acao client-row__acao--excluir" type="button">🗑️ Excluir</button>
     </div>
@@ -776,6 +777,11 @@ function criarLinhaCliente(cliente) {
   linha.querySelector('.client-row__acoes').hidden = estado.papelUsuario !== 'admin';
   linha.addEventListener('click', () => abrirDetalheCliente(cliente));
   linha.querySelector('.client-row__celular')?.addEventListener('click', (evento) => evento.stopPropagation());
+  linha.querySelector('.client-row__acao--compra').addEventListener('click', (evento) => {
+    evento.stopPropagation();
+    estado.clienteDetalheAtual = cliente;
+    abrirFormularioCompra('novo');
+  });
   linha.querySelector('.client-row__acao--editar').addEventListener('click', (evento) => {
     evento.stopPropagation();
     abrirFormulario('editar', cliente, 'clients');
