@@ -97,10 +97,6 @@
         </div>
       </div>
 
-      <button class="btn btn--primary btn--block" data-abrir-form="novo" data-admin-only type="button">
-        ➕ Novo cliente
-      </button>
-
       <div class="section-block">
         <div class="section-block__header">
           <h2>Clientes recentes</h2>
@@ -111,9 +107,12 @@
 
     <!-- Tela: Clientes -->
     <section class="screen" id="screen-clients" data-screen="clients">
-      <header class="screen__header">
-        <h1>Clientes</h1>
-        <p class="screen__subtitle" id="clients-subtitulo">0 clientes cadastrados</p>
+      <header class="screen__header screen__header--acao">
+        <div>
+          <h1>Clientes</h1>
+          <p class="screen__subtitle" id="clients-subtitulo">0 clientes cadastrados</p>
+        </div>
+        <button class="btn btn--primary btn--pequeno" data-abrir-form="novo" data-admin-only type="button">➕ Novo cliente</button>
       </header>
 
       <label class="search-bar">
@@ -134,7 +133,6 @@
         <span class="empty-state__icon" aria-hidden="true">🍬</span>
         <h3>Nenhum cliente por aqui ainda</h3>
         <p>Cadastre o primeiro cliente para começar a organizar sua doceria.</p>
-        <button class="btn btn--primary" data-abrir-form="novo" data-admin-only type="button">Cadastrar cliente</button>
       </div>
 
       <div class="empty-state" id="empty-busca" hidden>
