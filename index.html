@@ -318,23 +318,23 @@
 </div>
 
 <!-- Modal de confirmação de exclusão -->
-<div class="modal-overlay" id="modal-confirm" data-admin-only hidden>
+<div class="modal-overlay" id="modal-confirm" hidden>
   <div class="modal" role="alertdialog" aria-modal="true" aria-labelledby="modal-confirm-titulo">
     <h3 id="modal-confirm-titulo">Excluir cliente?</h3>
     <p id="modal-confirm-texto">Essa ação não pode ser desfeita.</p>
     <div class="modal__actions">
-      <button class="btn btn--ghost" id="btn-modal-cancelar" type="button">Cancelar</button>
-      <button class="btn btn--danger" id="btn-modal-confirmar" type="button">Excluir</button>
+      <button class="btn btn--ghost" id="btn-modal-cancelar" data-admin-only type="button">Cancelar</button>
+      <button class="btn btn--danger" id="btn-modal-confirmar" data-admin-only type="button">Excluir</button>
     </div>
   </div>
 </div>
 
 <!-- Modal de registro de pagamento -->
-<div class="modal-overlay" id="modal-pagamento" data-admin-only hidden>
+<div class="modal-overlay" id="modal-pagamento" hidden>
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-pagamento-titulo">
     <h3 id="modal-pagamento-titulo">Registrar pagamento</h3>
     <p id="modal-pagamento-saldo">Saldo em aberto: R$ 0,00</p>
-    <form id="form-pagamento" novalidate>
+    <form id="form-pagamento" data-admin-only novalidate>
       <label class="field">
         <span class="field__label">Valor recebido (R$)</span>
         <input type="number" id="pagamento-valor" min="0.01" step="0.01" inputmode="decimal" placeholder="0,00">
