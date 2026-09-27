@@ -82,6 +82,7 @@ button {
 
 #app[hidden],
 .login-screen[hidden] { display: none; }
+.app [hidden] { display: none !important; }
 
 a { color: var(--cor-primaria); }
 

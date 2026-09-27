@@ -77,6 +77,15 @@ const DB = {
     };
   },
 
+  async obterPerfilAtual(usuarioId) {
+    const linha = this._validarResposta(await this._supabase().from('user_profiles')
+      .select('display_name,access_role').eq('id', usuarioId).single());
+    if (!['admin', 'viewer'].includes(linha.access_role)) {
+      throw new Error('O perfil desta conta não possui um nível de acesso válido.');
+    }
+    return { nome: linha.display_name, papel: linha.access_role };
+  },
+
   async migrarDadosLocais() {
     const cliente = this._supabase();
     const usuario = this._validarResposta(await cliente.auth.getUser()).user;
@@ -287,6 +296,7 @@ const estado = {
   doceIdEmEdicao: null,
   origemFormularioDoce: 'sweets',
   nomeUsuario: '',
+  papelUsuario: 'viewer',
   aplicacaoIniciada: false,
   exclusao: null                // { tipo: 'cliente' | 'compra', id }
 };
@@ -331,8 +341,11 @@ function formatarMoeda(valor) {
 }
 
 async function entrarNoSistema(usuario) {
+  const perfil = await DB.obterPerfilAtual(usuario.id);
   const metadados = usuario.user_metadata || {};
-  estado.nomeUsuario = metadados.display_name || metadados.name || usuario.email?.split('@')[0] || 'Usuário';
+  estado.nomeUsuario = perfil.nome || metadados.display_name || metadados.name || usuario.email?.split('@')[0] || 'Usuário';
+  estado.papelUsuario = perfil.papel;
+  aplicarPermissoesInterface();
   document.getElementById('login-screen').hidden = true;
   document.getElementById('app').hidden = false;
   document.getElementById('erro-login').textContent = '';
@@ -342,11 +355,13 @@ async function entrarNoSistema(usuario) {
     estado.aplicacaoIniciada = true;
     let dadosMigrados = false;
     let erroMigracao = null;
-    try {
-      dadosMigrados = await DB.migrarDadosLocais();
-    } catch (erro) {
-      erroMigracao = erro;
-      console.error('Falha ao migrar dados locais para o Supabase:', erro);
+    if (estado.papelUsuario === 'admin') {
+      try {
+        dadosMigrados = await DB.migrarDadosLocais();
+      } catch (erro) {
+        erroMigracao = erro;
+        console.error('Falha ao migrar dados locais para o Supabase:', erro);
+      }
     }
     iniciar();
     if (dadosMigrados) mostrarToast('Dados locais importados para o Supabase.');
@@ -354,6 +369,13 @@ async function entrarNoSistema(usuario) {
   } else {
     irParaTela('home');
   }
+}
+
+function aplicarPermissoesInterface() {
+  const somenteAdmin = estado.papelUsuario === 'admin';
+  document.querySelectorAll('[data-admin-only]').forEach((elemento) => {
+    elemento.hidden = !somenteAdmin;
+  });
 }
 
 async function sairDoSistema() {
@@ -525,6 +547,7 @@ function criarLinhaDoce(doce) {
       <button class="client-row__acao client-row__acao--excluir" type="button">🗑️ Excluir</button>
     </div>
   `;
+  linha.querySelector('.doce-row__acoes').hidden = estado.papelUsuario !== 'admin';
   linha.querySelector('.client-row__acao--editar').addEventListener('click', () => {
     abrirFormularioDoce('editar', doce);
   });
@@ -716,6 +739,7 @@ function criarLinhaCliente(cliente) {
     </div>
   `;
 
+  linha.querySelector('.client-row__acoes').hidden = estado.papelUsuario !== 'admin';
   linha.addEventListener('click', () => abrirDetalheCliente(cliente));
   linha.querySelector('.client-row__celular').addEventListener('click', (evento) => evento.stopPropagation());
   linha.querySelector('.client-row__acao--editar').addEventListener('click', (evento) => {
@@ -823,8 +847,9 @@ function atualizarTelaDetalhe() {
     document.getElementById('detalhe-saldo-devedor').textContent = formatarMoeda(Math.max(0, totalGasto - totalPago));
     document.getElementById('detalhe-qtd-compras').textContent = compras.length;
     const temSaldoPendente = compras.some((compra) => obterValorPagoCompra(compra) < Number(compra.valor));
-    document.getElementById('btn-marcar-todas-pagas').hidden = !temSaldoPendente;
-    document.getElementById('btn-registrar-pagamento').hidden = !temSaldoPendente;
+    const podeEditar = estado.papelUsuario === 'admin';
+    document.getElementById('btn-marcar-todas-pagas').hidden = !podeEditar || !temSaldoPendente;
+    document.getElementById('btn-registrar-pagamento').hidden = !podeEditar || !temSaldoPendente;
 
     const ordenadas = [...compras].sort((a, b) => new Date(b.data) - new Date(a.data));
 
@@ -925,6 +950,7 @@ function criarLinhaCompra(compra) {
     </div>
   `;
 
+  linha.querySelector('.compra-row__acoes').hidden = estado.papelUsuario !== 'admin';
   linha.querySelector('.compra-row__acao-pagamento').addEventListener('click', () => {
     DB.atualizarPagamentoCompra(compra.id, !paga).then(() => {
       mostrarToast(paga ? 'Pagamento reaberto.' : 'Compra marcada como paga.');

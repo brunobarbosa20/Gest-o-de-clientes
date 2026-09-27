@@ -1,5 +1,12 @@
 create extension if not exists pgcrypto;
 
+create table if not exists public.user_profiles (
+  id uuid primary key references auth.users(id) on delete cascade,
+  display_name text not null default 'Usuário',
+  access_role text not null default 'viewer' check (access_role in ('admin', 'viewer')),
+  created_at timestamptz not null default now()
+);
+
 create table if not exists public.clients (
   id uuid primary key default gen_random_uuid(),
   owner_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
@@ -50,44 +57,127 @@ alter table public.clients enable row level security;
 alter table public.sweets enable row level security;
 alter table public.purchases enable row level security;
 alter table public.local_migrations enable row level security;
+alter table public.user_profiles enable row level security;
 
 grant select, insert, update, delete on public.clients, public.sweets, public.purchases to authenticated;
 grant select, insert on public.local_migrations to authenticated;
+grant select on public.user_profiles to authenticated;
+
+create or replace function public.is_system_admin()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  select exists (
+    select 1 from public.user_profiles
+    where id = (select auth.uid()) and access_role = 'admin'
+  );
+$$;
+
+revoke all on function public.is_system_admin() from public;
+grant execute on function public.is_system_admin() to authenticated;
+
+create or replace function public.handle_new_auth_user()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  insert into public.user_profiles (id, display_name, access_role)
+  values (
+    new.id,
+    coalesce(new.raw_user_meta_data->>'display_name', new.raw_user_meta_data->>'name', split_part(new.email, '@', 1)),
+    'viewer'
+  )
+  on conflict (id) do nothing;
+  return new;
+end;
+$$;
+
+drop trigger if exists on_auth_user_created_profile on auth.users;
+create trigger on_auth_user_created_profile
+  after insert on auth.users
+  for each row execute function public.handle_new_auth_user();
+
+insert into public.user_profiles (id, display_name, access_role)
+select id,
+       coalesce(raw_user_meta_data->>'display_name', raw_user_meta_data->>'name', split_part(email, '@', 1)),
+       'viewer'
+from auth.users
+on conflict (id) do nothing;
+
+update public.user_profiles
+set display_name = 'Beatriz', access_role = 'admin'
+where id = (select id from auth.users where lower(email) = lower('beatriz@admin.com'));
+
+drop policy if exists "Users read their own profile" on public.user_profiles;
+create policy "Users read their own profile" on public.user_profiles
+  for select to authenticated using (id = (select auth.uid()));
+
+drop policy if exists "Authenticated users view shared clients" on public.clients;
+create policy "Authenticated users view shared clients" on public.clients
+  for select to authenticated using (true);
+drop policy if exists "Admins insert clients" on public.clients;
+create policy "Admins insert clients" on public.clients
+  for insert to authenticated with check (public.is_system_admin() and owner_id = (select auth.uid()));
+drop policy if exists "Admins update clients" on public.clients;
+create policy "Admins update clients" on public.clients
+  for update to authenticated using (public.is_system_admin())
+  with check (public.is_system_admin() and owner_id = (select auth.uid()));
+drop policy if exists "Admins delete clients" on public.clients;
+create policy "Admins delete clients" on public.clients
+  for delete to authenticated using (public.is_system_admin());
 
 drop policy if exists "Owners manage their clients" on public.clients;
-create policy "Owners manage their clients" on public.clients
-  for all to authenticated using (owner_id = (select auth.uid()))
-  with check (owner_id = (select auth.uid()));
 
 drop policy if exists "Owners manage their sweets" on public.sweets;
-create policy "Owners manage their sweets" on public.sweets
-  for all to authenticated using (owner_id = (select auth.uid()))
-  with check (owner_id = (select auth.uid()));
+drop policy if exists "Authenticated users view shared sweets" on public.sweets;
+create policy "Authenticated users view shared sweets" on public.sweets
+  for select to authenticated using (true);
+drop policy if exists "Admins insert sweets" on public.sweets;
+create policy "Admins insert sweets" on public.sweets
+  for insert to authenticated with check (public.is_system_admin() and owner_id = (select auth.uid()));
+drop policy if exists "Admins update sweets" on public.sweets;
+create policy "Admins update sweets" on public.sweets
+  for update to authenticated using (public.is_system_admin())
+  with check (public.is_system_admin() and owner_id = (select auth.uid()));
+drop policy if exists "Admins delete sweets" on public.sweets;
+create policy "Admins delete sweets" on public.sweets
+  for delete to authenticated using (public.is_system_admin());
 
 drop policy if exists "Owners manage their purchases" on public.purchases;
-create policy "Owners manage their purchases" on public.purchases
-  for all to authenticated using (owner_id = (select auth.uid()))
-  with check (
-    owner_id = (select auth.uid())
-    and exists (
-      select 1 from public.clients
-      where clients.id = client_id and clients.owner_id = (select auth.uid())
-    )
-    and (
-      purchases.sweet_id is null
-      or exists (
-        select 1 from public.sweets
-        where sweets.id = purchases.sweet_id and sweets.owner_id = (select auth.uid())
-      )
-    )
+drop policy if exists "Authenticated users view shared purchases" on public.purchases;
+create policy "Authenticated users view shared purchases" on public.purchases
+  for select to authenticated using (true);
+drop policy if exists "Admins insert purchases" on public.purchases;
+create policy "Admins insert purchases" on public.purchases
+  for insert to authenticated with check (
+    public.is_system_admin()
+    and owner_id = (select auth.uid())
+    and exists (select 1 from public.clients where clients.id = purchases.client_id)
+    and (purchases.sweet_id is null or exists (
+      select 1 from public.sweets where sweets.id = purchases.sweet_id
+    ))
   );
+drop policy if exists "Admins update purchases" on public.purchases;
+create policy "Admins update purchases" on public.purchases
+  for update to authenticated using (public.is_system_admin())
+  with check (public.is_system_admin() and owner_id = (select auth.uid()));
+drop policy if exists "Admins delete purchases" on public.purchases;
+create policy "Admins delete purchases" on public.purchases
+  for delete to authenticated using (public.is_system_admin());
 
 drop policy if exists "Owners read their migration status" on public.local_migrations;
-create policy "Owners read their migration status" on public.local_migrations
-  for select to authenticated using (owner_id = (select auth.uid()));
 drop policy if exists "Owners create their migration status" on public.local_migrations;
-create policy "Owners create their migration status" on public.local_migrations
-  for insert to authenticated with check (owner_id = (select auth.uid()));
+drop policy if exists "Admins read migration status" on public.local_migrations;
+create policy "Admins read migration status" on public.local_migrations
+  for select to authenticated using (public.is_system_admin() and owner_id = (select auth.uid()));
+drop policy if exists "Admins create migration status" on public.local_migrations;
+create policy "Admins create migration status" on public.local_migrations
+  for insert to authenticated with check (public.is_system_admin() and owner_id = (select auth.uid()));
 
 create or replace function public.register_client_payment(p_client_id uuid, p_amount numeric, p_paid_at date)
 returns jsonb
@@ -102,6 +192,9 @@ declare
   v_outstanding numeric(12, 2);
   v_applied numeric(12, 2);
 begin
+  if not public.is_system_admin() then
+    raise exception 'Somente administradores podem registrar pagamentos.';
+  end if;
   if v_remaining <= 0 then
     raise exception 'Informe um valor de pagamento maior que zero.';
   end if;
@@ -155,6 +248,9 @@ as $$
 declare
   v_count integer;
 begin
+  if not public.is_system_admin() then
+    raise exception 'Somente administradores podem atualizar pagamentos.';
+  end if;
   update public.purchases
     set amount_paid = total_amount,
       paid_at = coalesce(paid_at, p_paid_at)
