@@ -766,7 +766,7 @@ function criarLinhaCliente(cliente) {
   const celular = cliente.celular?.trim();
   linha.innerHTML = `
     <div class="client-row__nome">${escaparHtml(cliente.nome)}</div>
-    ${celular ? `<a class="client-row__celular" href="tel:${apenasNumeros(celular)}">📞 ${escaparHtml(celular)}</a>` : ''}
+    ${celular ? `<a class="client-row__celular" href="tel:${apenasNumeros(celular)}">📞 ${escaparHtml(celular)}</a>` : '<span class="client-row__celular">Número não informado</span>'}
     <div class="client-row__acoes">
       <button class="client-row__acao client-row__acao--editar" type="button">✏️ Editar</button>
       <button class="client-row__acao client-row__acao--excluir" type="button">🗑️ Excluir</button>
