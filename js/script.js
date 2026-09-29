@@ -587,6 +587,7 @@ function irParaTela(nomeTela) {
   });
 
   if (nomeTela === 'home') atualizarTelaHome();
+  if (nomeTela === 'payments') atualizarTelaPagamentos();
   if (nomeTela === 'clients') atualizarTelaClientes();
   if (nomeTela === 'sweets') atualizarTelaDoces();
 
@@ -766,8 +767,6 @@ function atualizarTelaHome() {
 
     const totalItensVendidos = compras.reduce((total, compra) => total + (Number(compra.quantidade) || 1), 0);
     document.getElementById('stat-total-itens-vendidos').textContent = totalItensVendidos.toLocaleString('pt-BR');
-    renderizarPagamentosPendentes(compras, clientes);
-
     const recentes = [...clientes]
       .sort((a, b) => new Date(b.criadoEm) - new Date(a.criadoEm))
       .slice(0, 5);
@@ -792,6 +791,15 @@ function atualizarTelaHome() {
     recentes.forEach((cliente) => {
       container.appendChild(criarCardRecente(cliente));
     });
+  });
+}
+
+let dadosPagamentosPendentes = null;
+
+function atualizarTelaPagamentos() {
+  Promise.all([DB.listarCompras(), DB.listarClientes()]).then(([compras, clientes]) => {
+    dadosPagamentosPendentes = { compras, clientes };
+    renderizarPagamentosPendentes(compras, clientes);
   });
 }
 
@@ -820,15 +828,31 @@ function renderizarPagamentosPendentes(compras, clientes) {
   lista.replaceChildren();
   vazio.hidden = porData.size !== 0;
 
-  [...porData.entries()].sort(([dataA], [dataB]) => dataB.localeCompare(dataA)).forEach(([data, clientesDoDia]) => {
+  const ordenacaoData = document.getElementById('ordenacao-pagamentos-data').value;
+  const ordenacaoValor = document.getElementById('ordenacao-pagamentos-valor').value;
+  const gruposOrdenados = [...porData.entries()].map(([data, clientesDoDia]) => {
+    const pendencias = [...clientesDoDia.values()].sort((a, b) => {
+      if (ordenacaoValor === 'valor-maior') {
+        return b.valorCentavos - a.valorCentavos || a.cliente.nome.localeCompare(b.cliente.nome, 'pt-BR');
+      }
+      return a.valorCentavos - b.valorCentavos || a.cliente.nome.localeCompare(b.cliente.nome, 'pt-BR');
+    });
+    const totalCentavos = pendencias.reduce((total, pendencia) => total + pendencia.valorCentavos, 0);
+    return { data, pendencias, totalCentavos };
+  });
+
+  gruposOrdenados.sort((grupoA, grupoB) => {
+    if (ordenacaoData === 'data-antiga') return grupoA.data.localeCompare(grupoB.data);
+    return grupoB.data.localeCompare(grupoA.data);
+  });
+
+  gruposOrdenados.forEach(({ data, pendencias, totalCentavos }) => {
     const grupo = document.createElement('section');
     grupo.className = 'pending-day';
 
-    const pendencias = [...clientesDoDia.values()].sort((a, b) => a.cliente.nome.localeCompare(b.cliente.nome, 'pt-BR'));
-    const totalDoDia = pendencias.reduce((total, pendencia) => total + pendencia.valorCentavos, 0);
     const cabecalho = document.createElement('div');
     cabecalho.className = 'pending-day__header';
-    cabecalho.innerHTML = `<h3>${formatarDataResumo(data)}</h3><span>${formatarMoeda(totalDoDia / 100)}</span>`;
+    cabecalho.innerHTML = `<h3>${formatarDataResumo(data)}</h3><span>${formatarMoeda(totalCentavos / 100)}</span>`;
 
     const itens = document.createElement('div');
     itens.className = 'pending-day__items';
@@ -1476,6 +1500,19 @@ function iniciar() {
   document.getElementById('input-busca').addEventListener('input', (evento) => {
     estado.termoBusca = evento.target.value;
     DB.listarClientes().then(renderizarListaFiltrada);
+  });
+
+  const atualizarOrdenacaoPagamentos = () => {
+    if (dadosPagamentosPendentes) {
+      renderizarPagamentosPendentes(dadosPagamentosPendentes.compras, dadosPagamentosPendentes.clientes);
+    }
+  };
+  document.getElementById('ordenacao-pagamentos-data').addEventListener('change', atualizarOrdenacaoPagamentos);
+  document.getElementById('ordenacao-pagamentos-valor').addEventListener('change', atualizarOrdenacaoPagamentos);
+  document.getElementById('limpar-filtros-pagamentos').addEventListener('click', () => {
+    document.getElementById('ordenacao-pagamentos-data').value = 'data-recente';
+    document.getElementById('ordenacao-pagamentos-valor').value = 'valor-menor';
+    atualizarOrdenacaoPagamentos();
   });
 
   // Modal de exclusão
