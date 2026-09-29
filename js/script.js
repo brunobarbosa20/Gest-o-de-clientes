@@ -767,30 +767,6 @@ function atualizarTelaHome() {
 
     const totalItensVendidos = compras.reduce((total, compra) => total + (Number(compra.quantidade) || 1), 0);
     document.getElementById('stat-total-itens-vendidos').textContent = totalItensVendidos.toLocaleString('pt-BR');
-    const recentes = [...clientes]
-      .sort((a, b) => new Date(b.criadoEm) - new Date(a.criadoEm))
-      .slice(0, 5);
-
-    const container = document.getElementById('lista-recentes');
-    container.innerHTML = '';
-
-    if (recentes.length === 0) {
-      container.innerHTML = `
-        <div class="empty-state">
-          <span class="empty-state__icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 8.5C8 6.6 9.6 5 11.5 5s3.5 1.6 3.5 3.5V7h2.4A2.1 2.1 0 0 1 19.5 9.1v1.8a2.1 2.1 0 0 1-2.1 2.1H7.1A2.1 2.1 0 0 1 5 10.9V9.1A2.1 2.1 0 0 1 7.1 7H8v1.5Zm0 0V9.5h8V8.5M8 12v5a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2v-5"/></svg></span>
-          <h3>Nenhum cliente por aqui ainda</h3>
-          <p>Cadastre o primeiro cliente para começar a organizar sua doceria.</p>
-          <button class="btn btn--primary" data-abrir-form="novo" data-admin-only type="button">Cadastrar cliente</button>
-        </div>`;
-        const botaoNovoCliente = container.querySelector('[data-abrir-form="novo"]');
-        botaoNovoCliente.hidden = estado.papelUsuario !== 'admin';
-        botaoNovoCliente.addEventListener('click', () => abrirFormulario('novo'));
-      return;
-    }
-
-    recentes.forEach((cliente) => {
-      container.appendChild(criarCardRecente(cliente));
-    });
   });
 }
 
@@ -869,27 +845,6 @@ function renderizarPagamentosPendentes(compras, clientes) {
     grupo.append(cabecalho, itens);
     lista.appendChild(grupo);
   });
-}
-
-function criarCardRecente(cliente) {
-  const card = document.createElement('div');
-  card.className = 'client-card';
-  const celular = cliente.celular?.trim();
-  card.innerHTML = `
-    <div class="client-card__info">
-      <div class="client-card__nome">${escaparHtml(cliente.nome)}</div>
-      ${celular ? `<a class="client-card__celular" href="tel:${apenasNumeros(celular)}">${escaparHtml(celular)}</a>` : ''}
-    </div>
-    <button class="client-card__editar" data-admin-only type="button">Editar</button>
-  `;
-  card.querySelector('.client-card__editar').hidden = estado.papelUsuario !== 'admin';
-  card.addEventListener('click', () => abrirDetalheCliente(cliente));
-  card.querySelector('.client-card__celular')?.addEventListener('click', (evento) => evento.stopPropagation());
-  card.querySelector('.client-card__editar').addEventListener('click', (evento) => {
-    evento.stopPropagation();
-    abrirFormulario('editar', cliente, 'clients');
-  });
-  return card;
 }
 
 /* ------------------------------------------------------------
