@@ -398,6 +398,22 @@ async function sairDoSistema() {
 function iniciarAutenticacao() {
   const formulario = document.getElementById('form-login');
   const erroLogin = document.getElementById('erro-login');
+  const botaoTemaLogin = document.getElementById('theme-toggle');
+  const botaoTemaApp = document.getElementById('theme-toggle-app');
+
+  try {
+    const temaSalvo = localStorage.getItem('docegestao_theme') || 'light';
+    aplicarTema(temaSalvo);
+  } catch (erro) {
+    console.warn('Não foi possível carregar a preferência de tema.', erro);
+  }
+
+  if (botaoTemaLogin) {
+    botaoTemaLogin.addEventListener('click', alternarTema);
+  }
+  if (botaoTemaApp) {
+    botaoTemaApp.addEventListener('click', alternarTema);
+  }
 
   if (!window.DOCE_GESTAO_SUPABASE_CONFIG?.url || !window.DOCE_GESTAO_SUPABASE_CONFIG?.anonKey) {
     erroLogin.textContent = 'Configure a URL e a chave publicável do Supabase em js/supabase-config.js.';
@@ -465,6 +481,81 @@ function mostrarToast(mensagem, tipo) {
   toast.hidden = false;
   clearTimeout(timeoutToast);
   timeoutToast = setTimeout(() => { toast.hidden = true; }, 2600);
+}
+
+function aplicarTema(tema) {
+  const temaAtual = tema === 'dark' ? 'dark' : 'light';
+  const paleta = temaAtual === 'dark' ? {
+    'cor-fundo': '#12242e',
+    'cor-superficie': '#1c2e38',
+    'cor-superficie-alt': '#101f28',
+    'cor-primaria': '#fbe2a7',
+    'cor-primaria-escura': '#d8b86e',
+    'cor-primaria-clara': 'rgba(251, 226, 167, 0.12)',
+    'cor-acento': '#c67b96',
+    'cor-acento-clara': '#c67b96',
+    'cor-texto': '#f3e3ea',
+    'cor-texto-suave': '#e4a2b1',
+    'cor-borda': '#324859',
+    'cor-perigo': '#e35ea4',
+    'cor-perigo-clara': 'rgba(227, 94, 164, 0.12)',
+    'cor-sucesso': '#86efac'
+  } : {
+    'cor-fundo': '#F7F2EC',
+    'cor-superficie': '#FFFFFF',
+    'cor-superficie-alt': '#FBEDF1',
+    'cor-primaria': '#7A2E4A',
+    'cor-primaria-escura': '#5C2038',
+    'cor-primaria-clara': '#F1DDE4',
+    'cor-acento': '#C98A3B',
+    'cor-acento-clara': '#F3E3C9',
+    'cor-texto': '#2B1B22',
+    'cor-texto-suave': '#7A6871',
+    'cor-borda': '#E9DFDA',
+    'cor-perigo': '#B23A48',
+    'cor-perigo-clara': '#F6DEE0',
+    'cor-sucesso': '#4F7942'
+  };
+
+  Object.entries(paleta).forEach(([nome, valor]) => {
+    document.body.style.setProperty(`--${nome}`, valor);
+  });
+
+  document.body.dataset.theme = temaAtual;
+  document.body.classList.toggle('dark', temaAtual === 'dark');
+
+  const botoesTema = [
+    document.getElementById('theme-toggle'),
+    document.getElementById('theme-toggle-app')
+  ].filter(Boolean);
+
+  botoesTema.forEach((botao) => {
+    const icone = botao.querySelector('.nav__icon');
+    if (botao.id === 'theme-toggle') {
+      botao.textContent = temaAtual === 'dark' ? '☀️ Claro' : '🌙 Escuro';
+      botao.setAttribute('aria-label', temaAtual === 'dark' ? 'Ativar tema claro' : 'Ativar tema escuro');
+      return;
+    }
+
+    if (icone) {
+      icone.textContent = temaAtual === 'dark' ? '☀️' : '🌙';
+    }
+    const label = botao.querySelector('.nav__label');
+    if (label) {
+      label.textContent = temaAtual === 'dark' ? 'Claro' : 'Tema';
+    }
+  });
+
+  try {
+    localStorage.setItem('docegestao_theme', temaAtual);
+  } catch (erro) {
+    console.warn('Não foi possível salvar a preferência de tema.', erro);
+  }
+}
+
+function alternarTema() {
+  const temaAtual = document.body.dataset.theme === 'dark' ? 'light' : 'dark';
+  aplicarTema(temaAtual);
 }
 
 /* ------------------------------------------------------------
