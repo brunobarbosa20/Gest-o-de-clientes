@@ -485,6 +485,8 @@ function mostrarToast(mensagem, tipo) {
 
 function aplicarTema(tema) {
   const temaAtual = tema === 'dark' ? 'dark' : 'light';
+  const iconeLua = '<svg viewBox="0 0 24 24"><path d="M21 12.8A8.8 8.8 0 0 1 11.2 3a8.8 8.8 0 1 0 9.8 9.8Z"/></svg>';
+  const iconeSol = '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.5"/><path d="M12 2.5v2.2M12 19.3v2.2M4.9 4.9l1.6 1.6M17.5 17.5l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.9 19.1l1.6-1.6M17.5 6.5l1.6-1.6"/></svg>';
   const paleta = temaAtual === 'dark' ? {
     'cor-fundo': '#12242e',
     'cor-superficie': '#1c2e38',
@@ -530,15 +532,21 @@ function aplicarTema(tema) {
   ].filter(Boolean);
 
   botoesTema.forEach((botao) => {
-    const icone = botao.querySelector('.nav__icon');
+    const icone = botao.querySelector('.theme-toggle__icon, .nav__icon');
     if (botao.id === 'theme-toggle') {
-      botao.textContent = temaAtual === 'dark' ? '☀️ Claro' : '🌙 Escuro';
+      const label = botao.querySelector('.theme-toggle__label');
+      if (label) {
+        label.textContent = temaAtual === 'dark' ? 'Claro' : 'Escuro';
+      }
+      if (icone) {
+        icone.innerHTML = temaAtual === 'dark' ? iconeSol : iconeLua;
+      }
       botao.setAttribute('aria-label', temaAtual === 'dark' ? 'Ativar tema claro' : 'Ativar tema escuro');
       return;
     }
 
     if (icone) {
-      icone.textContent = temaAtual === 'dark' ? '☀️' : '🌙';
+      icone.innerHTML = temaAtual === 'dark' ? iconeSol : iconeLua;
     }
     const label = botao.querySelector('.nav__label');
     if (label) {
@@ -663,8 +671,14 @@ function criarLinhaDoce(doce) {
       <span class="doce-row__valor">${formatarMoeda(doce.valor)}</span>
     </div>
     <div class="doce-row__acoes">
-      <button class="client-row__acao client-row__acao--editar" type="button">✏️ Editar</button>
-      <button class="client-row__acao client-row__acao--excluir" type="button">🗑️ Excluir</button>
+      <button class="client-row__acao client-row__acao--editar" type="button">
+        <span class="btn__icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="m16.5 3.5 4 4L7 21l-5 1 1-5 14.5-13.5Z"/></svg></span>
+        <span class="btn__label">Editar</span>
+      </button>
+      <button class="client-row__acao client-row__acao--excluir" type="button">
+        <span class="btn__icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2m-9 0 1 13h8l1-13"/></svg></span>
+        <span class="btn__label">Excluir</span>
+      </button>
     </div>
   `;
   linha.querySelector('.doce-row__acoes').hidden = estado.papelUsuario !== 'admin';
@@ -764,7 +778,7 @@ function atualizarTelaHome() {
     if (recentes.length === 0) {
       container.innerHTML = `
         <div class="empty-state">
-          <span class="empty-state__icon">🍬</span>
+          <span class="empty-state__icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 8.5C8 6.6 9.6 5 11.5 5s3.5 1.6 3.5 3.5V7h2.4A2.1 2.1 0 0 1 19.5 9.1v1.8a2.1 2.1 0 0 1-2.1 2.1H7.1A2.1 2.1 0 0 1 5 10.9V9.1A2.1 2.1 0 0 1 7.1 7H8v1.5Zm0 0V9.5h8V8.5M8 12v5a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2v-5"/></svg></span>
           <h3>Nenhum cliente por aqui ainda</h3>
           <p>Cadastre o primeiro cliente para começar a organizar sua doceria.</p>
           <button class="btn btn--primary" data-abrir-form="novo" data-admin-only type="button">Cadastrar cliente</button>
@@ -910,11 +924,20 @@ function criarLinhaCliente(cliente) {
   const celular = cliente.celular?.trim();
   linha.innerHTML = `
     <div class="client-row__nome">${escaparHtml(cliente.nome)}</div>
-    ${celular ? `<a class="client-row__celular" href="tel:${apenasNumeros(celular)}">📞 ${escaparHtml(celular)}</a>` : '<span class="client-row__celular">Número não informado</span>'}
+    ${celular ? `<a class="client-row__celular" href="tel:${apenasNumeros(celular)}"><span class="btn__icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.4A19.5 19.5 0 0 1 3.2 9.8 2 2 0 0 1 5.1 8h3a2 2 0 0 1 2 1.7l.4 2.1a2 2 0 0 1-.6 1.8L8.3 14a16 16 0 0 0 5.7 5.7l.4-.6a2 2 0 0 1 1.8-.6l2.1.4A2 2 0 0 1 18.3 20Z"/></svg></span>${escaparHtml(celular)}</a>` : '<span class="client-row__celular">Número não informado</span>'}
     <div class="client-row__acoes">
-      <button class="client-row__acao client-row__acao--compra" type="button">➕ Nova compra</button>
-      <button class="client-row__acao client-row__acao--editar" type="button">✏️ Editar</button>
-      <button class="client-row__acao client-row__acao--excluir" type="button">🗑️ Excluir</button>
+      <button class="client-row__acao client-row__acao--compra" type="button">
+        <span class="btn__icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span>
+        <span class="btn__label">Nova compra</span>
+      </button>
+      <button class="client-row__acao client-row__acao--editar" type="button">
+        <span class="btn__icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="m16.5 3.5 4 4L7 21l-5 1 1-5 14.5-13.5Z"/></svg></span>
+        <span class="btn__label">Editar</span>
+      </button>
+      <button class="client-row__acao client-row__acao--excluir" type="button">
+        <span class="btn__icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2m-9 0 1 13h8l1-13"/></svg></span>
+        <span class="btn__label">Excluir</span>
+      </button>
     </div>
   `;
 
@@ -1128,8 +1151,8 @@ function criarLinhaCompra(compra) {
       <span class="compra-row__status ${classeStatus}">${textoStatus}</span>
       <div class="compra-row__acoes">
         <button class="compra-row__acao-pagamento" type="button">${textoAcaoPagamento}</button>
-        <button class="icon-btn" type="button" aria-label="Editar compra">✏️</button>
-        <button class="icon-btn" type="button" aria-label="Excluir compra">🗑️</button>
+        <button class="icon-btn" type="button" aria-label="Editar compra"><svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="m16.5 3.5 4 4L7 21l-5 1 1-5 14.5-13.5Z"/></svg></button>
+        <button class="icon-btn" type="button" aria-label="Excluir compra"><svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2m-9 0 1 13h8l1-13"/></svg></button>
       </div>
     </div>
   `;
