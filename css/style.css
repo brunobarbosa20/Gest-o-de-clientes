@@ -397,6 +397,7 @@ body[data-theme="dark"] .login-panel,
 }
 
 .nav__item {
+  position: relative;
   display: flex;
   flex-direction: row;
   justify-content: flex-start;
@@ -407,7 +408,24 @@ body[data-theme="dark"] .login-panel,
   font-size: 0.92rem;
   font-weight: 600;
   border-radius: var(--raio-peq);
-  transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease;
+  transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
+}
+.nav__item::before {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 9px;
+  bottom: 9px;
+  width: 2px;
+  border-radius: 2px;
+  background: currentColor;
+  opacity: 0;
+  transform: scaleY(0.35);
+  transition: opacity 0.2s ease, transform 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.nav__item.is-active::before {
+  opacity: 1;
+  transform: scaleY(1);
 }
 .nav__item:hover {
   background: var(--cor-superficie-alt);
@@ -456,7 +474,7 @@ body[data-theme="dark"] .login-panel,
 .screen { display: none; }
 .screen.is-active {
   display: block;
-  animation: entrar 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: entrar 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 @keyframes entrar {
