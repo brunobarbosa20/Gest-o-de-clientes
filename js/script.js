@@ -488,35 +488,35 @@ function aplicarTema(tema) {
   const iconeLua = '<svg viewBox="0 0 24 24"><path d="M21 12.8A8.8 8.8 0 0 1 11.2 3a8.8 8.8 0 1 0 9.8 9.8Z"/></svg>';
   const iconeSol = '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.5"/><path d="M12 2.5v2.2M12 19.3v2.2M4.9 4.9l1.6 1.6M17.5 17.5l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.9 19.1l1.6-1.6M17.5 6.5l1.6-1.6"/></svg>';
   const paleta = temaAtual === 'dark' ? {
-    'cor-fundo': '#12242e',
-    'cor-superficie': '#1c2e38',
-    'cor-superficie-alt': '#101f28',
-    'cor-primaria': '#fbe2a7',
-    'cor-primaria-escura': '#d8b86e',
-    'cor-primaria-clara': 'rgba(251, 226, 167, 0.12)',
-    'cor-acento': '#c67b96',
-    'cor-acento-clara': '#c67b96',
-    'cor-texto': '#f3e3ea',
-    'cor-texto-suave': '#e4a2b1',
-    'cor-borda': '#324859',
-    'cor-perigo': '#e35ea4',
-    'cor-perigo-clara': 'rgba(227, 94, 164, 0.12)',
-    'cor-sucesso': '#86efac'
+    'cor-fundo': '#201a1d',
+    'cor-superficie': '#2b2428',
+    'cor-superficie-alt': '#372d32',
+    'cor-primaria': '#f4dbe5',
+    'cor-primaria-escura': '#ffffff',
+    'cor-primaria-clara': 'rgba(244, 219, 229, 0.14)',
+    'cor-acento': '#f0a6c2',
+    'cor-acento-clara': 'rgba(240, 166, 194, 0.16)',
+    'cor-texto': '#f6eef1',
+    'cor-texto-suave': '#cbbbc2',
+    'cor-borda': '#55464d',
+    'cor-perigo': '#ee8f7b',
+    'cor-perigo-clara': 'rgba(238, 143, 123, 0.12)',
+    'cor-sucesso': '#76c79b'
   } : {
-    'cor-fundo': '#F7F2EC',
-    'cor-superficie': '#FFFFFF',
-    'cor-superficie-alt': '#FBEDF1',
-    'cor-primaria': '#7A2E4A',
-    'cor-primaria-escura': '#5C2038',
-    'cor-primaria-clara': '#F1DDE4',
-    'cor-acento': '#C98A3B',
-    'cor-acento-clara': '#F3E3C9',
-    'cor-texto': '#2B1B22',
-    'cor-texto-suave': '#7A6871',
-    'cor-borda': '#E9DFDA',
-    'cor-perigo': '#B23A48',
-    'cor-perigo-clara': '#F6DEE0',
-    'cor-sucesso': '#4F7942'
+    'cor-fundo': '#faf7f8',
+    'cor-superficie': '#ffffff',
+    'cor-superficie-alt': '#f5eef2',
+    'cor-primaria': '#4a3d45',
+    'cor-primaria-escura': '#30262d',
+    'cor-primaria-clara': 'rgba(74, 61, 69, 0.10)',
+    'cor-acento': '#c6537d',
+    'cor-acento-clara': 'rgba(198, 83, 125, 0.14)',
+    'cor-texto': '#302a2d',
+    'cor-texto-suave': '#766c72',
+    'cor-borda': '#eadfe4',
+    'cor-perigo': '#d96f60',
+    'cor-perigo-clara': 'rgba(217, 111, 96, 0.12)',
+    'cor-sucesso': '#3d8e69'
   };
 
   Object.entries(paleta).forEach(([nome, valor]) => {
