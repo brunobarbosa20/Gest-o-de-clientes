@@ -210,6 +210,13 @@ body[data-theme="dark"] .login-panel,
   margin-top: -4px;
 }
 
+.login__bloqueio {
+  margin-top: -12px;
+  color: var(--cor-texto-suave);
+  font-size: 0.88rem;
+  text-align: center;
+}
+
 .nav__item--logout { margin-top: auto; }
 .nav__item--logout .nav__icon { font-size: 1.4rem; }
 
