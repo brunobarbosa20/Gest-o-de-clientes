@@ -84,6 +84,12 @@
         </span>
         <span class="nav__label">Doces</span>
       </button>
+      <button class="nav__item" data-screen="loyalty" type="button">
+        <span class="nav__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9L12 3Z"/></svg>
+        </span>
+        <span class="nav__label">Fidelidade</span>
+      </button>
       <button class="nav__item nav__item--theme" id="theme-toggle-app" type="button">
         <span class="nav__icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A8.8 8.8 0 0 1 11.2 3a8.8 8.8 0 1 0 9.8 9.8Z"/></svg>
@@ -256,6 +262,22 @@
         <h3>Nenhum doce cadastrado</h3>
         <p>Cadastre os doces e preços disponíveis para registrar as compras.</p>
         <button class="btn btn--primary" id="btn-cadastrar-primeiro-doce" data-admin-only type="button">Cadastrar doce</button>
+      </div>
+    </section>
+
+    <!-- Tela: Fidelidade -->
+    <section class="screen" id="screen-loyalty" data-screen="loyalty">
+      <header class="screen__header">
+        <h1>Fidelidade</h1>
+        <p class="screen__subtitle">Novidades para valorizar seus clientes.</p>
+      </header>
+
+      <div class="empty-state empty-state--compacto" role="status">
+        <span class="empty-state__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9L12 3Z"/></svg>
+        </span>
+        <h3>Em desenvolvimento</h3>
+        <p>Em breve, novidades sobre fidelidade para seus clientes.</p>
       </div>
     </section>
 
