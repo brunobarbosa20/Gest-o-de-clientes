@@ -784,12 +784,14 @@ function renderizarPagamentosPendentes(compras, clientes) {
   const vazio = document.getElementById('empty-pagamentos-pendentes');
   const clientePorId = new Map(clientes.map((cliente) => [cliente.id, cliente]));
   const porData = new Map();
+  const termoCliente = document.getElementById('busca-pagamentos-cliente').value.trim().toLocaleLowerCase('pt-BR');
   let totalPendenteCentavos = 0;
 
   compras.forEach((compra) => {
     const valorPendente = Math.max(0, paraCentavos(compra.valor) - paraCentavos(obterValorPagoCompra(compra)));
     const cliente = clientePorId.get(compra.clienteId);
-    if (valorPendente === 0 || !cliente || !compra.data) return;
+    if (valorPendente === 0 || !cliente || !compra.data
+      || (termoCliente && !cliente.nome.toLocaleLowerCase('pt-BR').includes(termoCliente))) return;
 
     totalPendenteCentavos += valorPendente;
     if (!porData.has(compra.data)) porData.set(compra.data, new Map());
@@ -803,6 +805,9 @@ function renderizarPagamentosPendentes(compras, clientes) {
   document.getElementById('total-pagamentos-pendentes').textContent = formatarMoeda(totalPendenteCentavos / 100);
   lista.replaceChildren();
   vazio.hidden = porData.size !== 0;
+  vazio.querySelector('p').textContent = termoCliente
+    ? 'Nenhum pagamento pendente encontrado para esse cliente.'
+    : 'Nenhum pagamento pendente.';
 
   const ordenacaoData = document.getElementById('ordenacao-pagamentos-data').value;
   const ordenacaoValor = document.getElementById('ordenacao-pagamentos-valor').value;
@@ -1464,9 +1469,11 @@ function iniciar() {
   };
   document.getElementById('ordenacao-pagamentos-data').addEventListener('change', atualizarOrdenacaoPagamentos);
   document.getElementById('ordenacao-pagamentos-valor').addEventListener('change', atualizarOrdenacaoPagamentos);
+  document.getElementById('busca-pagamentos-cliente').addEventListener('input', atualizarOrdenacaoPagamentos);
   document.getElementById('limpar-filtros-pagamentos').addEventListener('click', () => {
     document.getElementById('ordenacao-pagamentos-data').value = 'data-recente';
     document.getElementById('ordenacao-pagamentos-valor').value = 'valor-menor';
+    document.getElementById('busca-pagamentos-cliente').value = '';
     atualizarOrdenacaoPagamentos();
   });
 
