@@ -398,45 +398,8 @@ async function sairDoSistema() {
 function iniciarAutenticacao() {
   const formulario = document.getElementById('form-login');
   const erroLogin = document.getElementById('erro-login');
-  const contadorBloqueio = document.getElementById('contador-bloqueio');
-  const campoUsuario = document.getElementById('login-usuario');
-  const botaoEnviar = formulario.querySelector('[type="submit"]');
   const botaoTemaLogin = document.getElementById('theme-toggle');
   const botaoTemaApp = document.getElementById('theme-toggle-app');
-  let intervaloBloqueio = null;
-  let emailBloqueado = '';
-  let bloqueioAte = 0;
-  let loginEmAndamento = false;
-
-  function atualizarEstadoBloqueio() {
-    const bloqueado = emailBloqueado === campoUsuario.value.trim().toLowerCase()
-      && Date.now() < bloqueioAte;
-    botaoEnviar.disabled = loginEmAndamento || bloqueado;
-    if (bloqueado) {
-      const segundos = Math.ceil((bloqueioAte - Date.now()) / 1000);
-      erroLogin.textContent = 'Usuário ou senha incorretos.';
-      contadorBloqueio.textContent = `Tente novamente em ${segundos}s.`;
-      contadorBloqueio.hidden = false;
-      return;
-    }
-
-    contadorBloqueio.hidden = true;
-    if (emailBloqueado && Date.now() >= bloqueioAte) {
-      emailBloqueado = '';
-      bloqueioAte = 0;
-      clearInterval(intervaloBloqueio);
-      intervaloBloqueio = null;
-      contadorBloqueio.textContent = '';
-    }
-  }
-
-  function iniciarContadorBloqueio(email, segundos) {
-    clearInterval(intervaloBloqueio);
-    emailBloqueado = email.trim().toLowerCase();
-    bloqueioAte = Date.now() + segundos * 1000;
-    atualizarEstadoBloqueio();
-    intervaloBloqueio = setInterval(atualizarEstadoBloqueio, 250);
-  }
 
   try {
     const temaSalvo = localStorage.getItem('docegestao_theme') || 'light';
@@ -458,63 +421,26 @@ function iniciarAutenticacao() {
 
   formulario.addEventListener('submit', async (evento) => {
     evento.preventDefault();
-    const email = campoUsuario.value.trim();
+    const email = document.getElementById('login-usuario').value.trim();
     const senha = document.getElementById('login-senha').value;
-    if (emailBloqueado === email.toLowerCase() && Date.now() < bloqueioAte) {
-      atualizarEstadoBloqueio();
-      return;
-    }
-
-    loginEmAndamento = true;
+    const botaoEnviar = formulario.querySelector('[type="submit"]');
     botaoEnviar.disabled = true;
     erroLogin.textContent = '';
-    contadorBloqueio.hidden = true;
-    contadorBloqueio.textContent = '';
 
     try {
-      const configuracao = window.DOCE_GESTAO_SUPABASE_CONFIG;
-      const resposta = await fetch(`${configuracao.url}/functions/v1/login`, {
-        method: 'POST',
-        headers: {
-          apikey: configuracao.anonKey,
-          Authorization: `Bearer ${configuracao.anonKey}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ email, password: senha })
-      });
-      const resultado = await resposta.json();
-
-      if (!resposta.ok) {
-        if (resultado.retryAfter > 0) {
-          erroLogin.textContent = 'Usuário ou senha incorretos.';
-          iniciarContadorBloqueio(email, resultado.retryAfter);
-        } else if (resposta.status === 401) {
-          erroLogin.textContent = 'Usuário ou senha incorretos.';
-        } else {
-          throw new Error('Não foi possível processar o login. Tente novamente.');
-        }
-        document.getElementById('login-senha').value = '';
-        document.getElementById('login-senha').focus({ preventScroll: true });
-        return;
-      }
-
-      const { data, error } = await DB._supabase().auth.setSession({
-        access_token: resultado.access_token,
-        refresh_token: resultado.refresh_token
-      });
+      const { data, error } = await DB._supabase().auth.signInWithPassword({ email, password: senha });
       if (error) throw error;
       await entrarNoSistema(data.user);
     } catch (erro) {
-      erroLogin.textContent = erro.message || 'Não foi possível conectar ao Supabase.';
+      erroLogin.textContent = erro.message?.includes('Invalid login credentials')
+        ? 'E-mail ou senha incorretos.'
+        : erro.message || 'Não foi possível conectar ao Supabase.';
       document.getElementById('login-senha').value = '';
       document.getElementById('login-senha').focus({ preventScroll: true });
     } finally {
-      loginEmAndamento = false;
-      atualizarEstadoBloqueio();
+      botaoEnviar.disabled = false;
     }
   });
-
-  campoUsuario.addEventListener('input', atualizarEstadoBloqueio);
 
   document.getElementById('btn-sair').addEventListener('click', sairDoSistema);
 
