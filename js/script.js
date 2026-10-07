@@ -86,6 +86,27 @@ const DB = {
     return { nome: linha.display_name, papel: linha.access_role };
   },
 
+  async listarAtividades() {
+    return this._validarResposta(await this._supabase().from('activity_logs')
+      .select('*').order('created_at', { ascending: false }).limit(8));
+  },
+
+  async registrarAtividade({ evento, entidade, nome, detalhes = '' }) {
+    try {
+      this._validarResposta(await this._supabase().from('activity_logs').insert({
+        actor_id: estado.usuarioId,
+        actor_name: estado.nomeUsuario,
+        event_type: evento,
+        entity_type: entidade,
+        entity_name: nome,
+        details: detalhes
+      }));
+      if (estado.telaAtual === 'home') atualizarListaAtividades();
+    } catch (erro) {
+      console.error('Não foi possível registrar a atividade:', erro);
+    }
+  },
+
   async migrarDadosLocais() {
     const cliente = this._supabase();
     const usuario = this._validarResposta(await cliente.auth.getUser()).user;
@@ -170,14 +191,17 @@ const DB = {
     const dados = { name: dadosCliente.nome, phone: dadosCliente.celular, updated_at: new Date().toISOString() };
     if (dadosCliente.id) {
       const data = this._validarResposta(await cliente.from('clients').update(dados).eq('id', dadosCliente.id).select('*').single());
+      await this.registrarAtividade({ evento: 'client_updated', entidade: 'cliente', nome: dadosCliente.nome });
       return this._clienteDaLinha(data);
     }
     const data = this._validarResposta(await cliente.from('clients').insert({ ...dados, created_at: new Date().toISOString() }).select('*').single());
+    await this.registrarAtividade({ evento: 'client_created', entidade: 'cliente', nome: dadosCliente.nome });
     return this._clienteDaLinha(data);
   },
 
-  async excluirCliente(id) {
+  async excluirCliente(id, nome) {
     this._validarResposta(await this._supabase().from('clients').delete().eq('id', id));
+    await this.registrarAtividade({ evento: 'client_deleted', entidade: 'cliente', nome });
     return true;
   },
 
@@ -215,13 +239,21 @@ const DB = {
         amount_paid: valorPago,
         paid_at: estaPaga ? existente.paid_at || obterDataLocalISO() : null
       }).eq('id', dadosCompra.id).select('*').single());
+      await this.registrarAtividade({
+        evento: 'purchase_updated', entidade: 'compra', nome: dadosCompra.descricao,
+        detalhes: `Cliente: ${dadosCompra.clienteNome} - ${dadosCompra.quantidade} item(ns) - ${formatarMoeda(dadosCompra.valor)}`
+      });
       return this._compraDaLinha(data);
     }
     const data = this._validarResposta(await cliente.from('purchases').insert(dados).select('*').single());
+    await this.registrarAtividade({
+      evento: 'purchase_created', entidade: 'compra', nome: dadosCompra.descricao,
+      detalhes: `Cliente: ${dadosCompra.clienteNome} - ${dadosCompra.quantidade} item(ns) - ${formatarMoeda(dadosCompra.valor)}`
+    });
     return this._compraDaLinha(data);
   },
 
-  async atualizarPagamentoCompra(id, pago) {
+  async atualizarPagamentoCompra(id, pago, compra) {
     const cliente = this._supabase();
     const existente = this._validarResposta(await cliente.from('purchases').select('total_amount')
       .eq('id', id).single());
@@ -229,27 +261,46 @@ const DB = {
       amount_paid: pago ? Number(existente.total_amount) : 0,
       paid_at: pago ? obterDataLocalISO() : null
     }).eq('id', id).select('*').single());
+    await this.registrarAtividade({
+      evento: pago ? 'payment_received' : 'payment_reopened', entidade: 'pagamento',
+      nome: compra?.descricao || 'Compra', detalhes: formatarMoeda(existente.total_amount)
+    });
     return this._compraDaLinha(data);
   },
 
-  async marcarComprasDoClienteComoPagas(clienteId) {
-    return this._validarResposta(await this._supabase().rpc('mark_client_purchases_paid', {
+  async marcarComprasDoClienteComoPagas(clienteId, nomeCliente) {
+    const quantidade = this._validarResposta(await this._supabase().rpc('mark_client_purchases_paid', {
       p_client_id: clienteId,
       p_paid_at: obterDataLocalISO()
     }));
+    if (quantidade > 0) {
+      await this.registrarAtividade({
+        evento: 'payments_settled', entidade: 'pagamento', nome: nomeCliente,
+        detalhes: `${quantidade} compra(s)`
+      });
+    }
+    return quantidade;
   },
 
-  async registrarPagamentoCliente(clienteId, valor) {
+  async registrarPagamentoCliente(clienteId, valor, nomeCliente) {
     const data = this._validarResposta(await this._supabase().rpc('register_client_payment', {
       p_client_id: clienteId,
       p_amount: valor,
       p_paid_at: obterDataLocalISO()
     }));
+    await this.registrarAtividade({
+      evento: 'payment_received', entidade: 'pagamento', nome: nomeCliente,
+      detalhes: formatarMoeda(data.applied)
+    });
     return { valorPago: Number(data.applied), saldoDevedor: Number(data.balance) };
   },
 
-  async excluirCompra(id) {
+  async excluirCompra(id, nome, nomeCliente) {
     this._validarResposta(await this._supabase().from('purchases').delete().eq('id', id));
+    await this.registrarAtividade({
+      evento: 'purchase_deleted', entidade: 'compra', nome,
+      detalhes: nomeCliente ? `Cliente: ${nomeCliente}` : ''
+    });
     return true;
   },
 
@@ -270,14 +321,23 @@ const DB = {
     const dados = { name: dadosDoce.nome, price: dadosDoce.valor };
     if (dadosDoce.id) {
       const data = this._validarResposta(await cliente.from('sweets').update(dados).eq('id', dadosDoce.id).select('*').single());
+      await this.registrarAtividade({
+        evento: 'sweet_updated', entidade: 'doce', nome: dadosDoce.nome,
+        detalhes: `Preço: ${formatarMoeda(dadosDoce.valor)}`
+      });
       return this._doceDaLinha(data);
     }
     const data = this._validarResposta(await cliente.from('sweets').insert(dados).select('*').single());
+    await this.registrarAtividade({
+      evento: 'sweet_created', entidade: 'doce', nome: dadosDoce.nome,
+      detalhes: `Preço: ${formatarMoeda(dadosDoce.valor)}`
+    });
     return this._doceDaLinha(data);
   },
 
-  async excluirDoce(id) {
+  async excluirDoce(id, nome) {
     this._validarResposta(await this._supabase().from('sweets').delete().eq('id', id));
+    await this.registrarAtividade({ evento: 'sweet_deleted', entidade: 'doce', nome });
     return true;
   }
 };
@@ -295,6 +355,7 @@ const estado = {
   compraIdEmEdicao: null,       // compra em edição (null = cadastro novo)
   doceIdEmEdicao: null,
   origemFormularioDoce: 'sweets',
+  usuarioId: null,
   nomeUsuario: '',
   papelUsuario: 'viewer',
   aplicacaoIniciada: false,
@@ -344,6 +405,7 @@ async function entrarNoSistema(usuario) {
   const perfil = await DB.obterPerfilAtual(usuario.id);
   const metadados = usuario.user_metadata || {};
   estado.nomeUsuario = perfil.nome || metadados.display_name || metadados.name || usuario.email?.split('@')[0] || 'Usuário';
+  estado.usuarioId = usuario.id;
   estado.papelUsuario = perfil.papel;
   aplicarPermissoesInterface();
   document.getElementById('login-screen').hidden = true;
@@ -768,6 +830,72 @@ function atualizarTelaHome() {
     const totalItensVendidos = compras.reduce((total, compra) => total + (Number(compra.quantidade) || 1), 0);
     document.getElementById('stat-total-itens-vendidos').textContent = totalItensVendidos.toLocaleString('pt-BR');
   });
+  atualizarListaAtividades();
+}
+
+const rotulosAtividade = {
+  client_created: 'Cliente cadastrado',
+  client_updated: 'Cliente atualizado',
+  client_deleted: 'Cliente excluído',
+  purchase_created: 'Compra registrada',
+  purchase_updated: 'Compra atualizada',
+  purchase_deleted: 'Compra excluída',
+  payment_received: 'Pagamento registrado',
+  payment_reopened: 'Pagamento reaberto',
+  payments_settled: 'Compras marcadas como pagas',
+  sweet_created: 'Doce cadastrado',
+  sweet_updated: 'Doce atualizado',
+  sweet_deleted: 'Doce excluído'
+};
+
+function atualizarListaAtividades() {
+  DB.listarAtividades().then(renderizarAtividades).catch((erro) => {
+    console.error('Não foi possível carregar as atividades recentes:', erro);
+    document.getElementById('lista-atividades').replaceChildren();
+    document.getElementById('empty-atividades').hidden = false;
+    document.querySelector('#empty-atividades p').textContent = 'Não foi possível carregar as atividades.';
+  });
+}
+
+function renderizarAtividades(atividades) {
+  const lista = document.getElementById('lista-atividades');
+  const vazio = document.getElementById('empty-atividades');
+  lista.replaceChildren();
+  vazio.hidden = atividades.length !== 0;
+  document.querySelector('#empty-atividades p').textContent = 'Nenhuma atividade registrada ainda.';
+
+  atividades.forEach((atividade) => {
+    const item = document.createElement('article');
+    item.className = 'activity-item';
+    const icone = document.createElement('span');
+    icone.className = 'activity-item__icon';
+    icone.setAttribute('aria-hidden', 'true');
+    icone.textContent = atividade.entity_type === 'pagamento'
+      ? 'R$'
+      : atividade.entity_name.slice(0, 1).toLocaleUpperCase('pt-BR');
+
+    const conteudo = document.createElement('div');
+    conteudo.className = 'activity-item__content';
+    const cabecalho = document.createElement('div');
+    cabecalho.className = 'activity-item__heading';
+    const rotulo = document.createElement('strong');
+    rotulo.textContent = rotulosAtividade[atividade.event_type] || 'Atividade registrada';
+    const horario = document.createElement('time');
+    horario.className = 'activity-item__time';
+    horario.dateTime = atividade.created_at;
+    horario.textContent = new Date(atividade.created_at).toLocaleString('pt-BR', {
+      dateStyle: 'short', timeStyle: 'short'
+    });
+    cabecalho.append(rotulo, horario);
+
+    const detalhes = document.createElement('p');
+    detalhes.className = 'activity-item__details';
+    detalhes.textContent = [atividade.entity_name, atividade.details, `por ${atividade.actor_name}`]
+      .filter(Boolean).join(' · ');
+    conteudo.append(cabecalho, detalhes);
+    item.append(icone, conteudo);
+    lista.appendChild(item);
+  });
 }
 
 let dadosPagamentosPendentes = null;
@@ -1099,7 +1227,7 @@ function tratarEnvioFormularioPagamento(evento) {
     return;
   }
 
-  DB.registrarPagamentoCliente(estado.clienteDetalheAtual.id, valor).then((resultado) => {
+  DB.registrarPagamentoCliente(estado.clienteDetalheAtual.id, valor, estado.clienteDetalheAtual.nome).then((resultado) => {
     fecharModalPagamento();
     mostrarToast(`Pagamento de ${formatarMoeda(resultado.valorPago)} registrado. Saldo: ${formatarMoeda(resultado.saldoDevedor)}.`);
     atualizarTelaDetalhe();
@@ -1143,7 +1271,7 @@ function criarLinhaCompra(compra) {
 
   linha.querySelector('.compra-row__acoes').hidden = estado.papelUsuario !== 'admin';
   linha.querySelector('.compra-row__acao-pagamento').addEventListener('click', () => {
-    DB.atualizarPagamentoCompra(compra.id, !paga).then(() => {
+    DB.atualizarPagamentoCompra(compra.id, !paga, compra).then(() => {
       mostrarToast(paga ? 'Pagamento reaberto.' : 'Compra marcada como paga.');
       atualizarTelaDetalhe();
       atualizarTelaHome();
@@ -1290,7 +1418,8 @@ function tratarEnvioFormularioCompra(evento) {
     quantidade,
     valorUnitario,
     valor: valor,
-    data: data
+    data: data,
+    clienteNome: estado.clienteDetalheAtual.nome
   };
 
   DB.salvarCompra(dados).then(() => {
@@ -1308,7 +1437,7 @@ function tratarEnvioFormularioCompra(evento) {
    ------------------------------------------------------------ */
 
 function abrirModalConfirmacao(cliente) {
-  estado.exclusao = { tipo: 'cliente', id: cliente.id };
+  estado.exclusao = { tipo: 'cliente', id: cliente.id, nome: cliente.nome };
   document.getElementById('modal-confirm-titulo').textContent = 'Excluir cliente?';
   document.getElementById('modal-confirm-texto').textContent =
     `Tem certeza de que deseja excluir "${cliente.nome}"? As compras registradas dele também serão apagadas.`;
@@ -1316,7 +1445,7 @@ function abrirModalConfirmacao(cliente) {
 }
 
 function abrirModalConfirmacaoCompra(compra) {
-  estado.exclusao = { tipo: 'compra', id: compra.id };
+  estado.exclusao = { tipo: 'compra', id: compra.id, nome: compra.descricao, nomeCliente: estado.clienteDetalheAtual?.nome };
   document.getElementById('modal-confirm-titulo').textContent = 'Excluir compra?';
   document.getElementById('modal-confirm-texto').textContent =
     `Tem certeza de que deseja excluir "${compra.descricao}"? Essa ação não pode ser desfeita.`;
@@ -1324,7 +1453,7 @@ function abrirModalConfirmacaoCompra(compra) {
 }
 
 function abrirModalConfirmacaoDoce(doce) {
-  estado.exclusao = { tipo: 'doce', id: doce.id };
+  estado.exclusao = { tipo: 'doce', id: doce.id, nome: doce.nome };
   document.getElementById('modal-confirm-titulo').textContent = 'Excluir doce?';
   document.getElementById('modal-confirm-texto').textContent =
     `Tem certeza de que deseja excluir "${doce.nome}" do catálogo? Compras já registradas não serão alteradas.`;
@@ -1338,10 +1467,10 @@ function fecharModalConfirmacao() {
 
 function confirmarExclusao() {
   if (!estado.exclusao) return;
-  const { tipo, id } = estado.exclusao;
+  const { tipo, id, nome, nomeCliente } = estado.exclusao;
 
   if (tipo === 'cliente') {
-    DB.excluirCliente(id).then(() => {
+    DB.excluirCliente(id, nome).then(() => {
       mostrarToast('Cliente excluído.');
       fecharModalConfirmacao();
       if (estado.telaAtual === 'detalhe') irParaTela('clients');
@@ -1349,14 +1478,14 @@ function confirmarExclusao() {
       atualizarTelaHome();
     });
   } else if (tipo === 'compra') {
-    DB.excluirCompra(id).then(() => {
+    DB.excluirCompra(id, nome, nomeCliente).then(() => {
       mostrarToast('Compra excluída.');
       fecharModalConfirmacao();
       atualizarTelaDetalhe();
       atualizarTelaHome();
     });
   } else {
-    DB.excluirDoce(id).then(() => {
+    DB.excluirDoce(id, nome).then(() => {
       mostrarToast('Doce excluído do catálogo.');
       fecharModalConfirmacao();
       atualizarTelaDoces();
@@ -1430,7 +1559,7 @@ function iniciar() {
     const cliente = estado.clienteDetalheAtual;
     if (!cliente) return;
 
-    DB.marcarComprasDoClienteComoPagas(cliente.id).then((quantidadeAtualizada) => {
+    DB.marcarComprasDoClienteComoPagas(cliente.id, cliente.nome).then((quantidadeAtualizada) => {
       if (quantidadeAtualizada === 0) return;
       mostrarToast('Todas as compras foram marcadas como pagas.');
       atualizarTelaDetalhe();

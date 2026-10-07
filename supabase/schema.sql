@@ -53,15 +53,31 @@ create table if not exists public.local_migrations (
   completed_at timestamptz not null default now()
 );
 
+create table if not exists public.activity_logs (
+  id uuid primary key default gen_random_uuid(),
+  actor_id uuid references auth.users(id) on delete set null,
+  actor_name text not null,
+  event_type text not null,
+  entity_type text not null,
+  entity_name text not null,
+  details text not null default '',
+  created_at timestamptz not null default now()
+);
+
+create index if not exists activity_logs_created_at_idx
+  on public.activity_logs (created_at desc);
+
 alter table public.clients enable row level security;
 alter table public.sweets enable row level security;
 alter table public.purchases enable row level security;
 alter table public.local_migrations enable row level security;
 alter table public.user_profiles enable row level security;
+alter table public.activity_logs enable row level security;
 
 grant select, insert, update, delete on public.clients, public.sweets, public.purchases to authenticated;
 grant select, insert on public.local_migrations to authenticated;
 grant select on public.user_profiles to authenticated;
+grant select, insert on public.activity_logs to authenticated;
 
 create or replace function public.is_system_admin()
 returns boolean
@@ -116,6 +132,13 @@ where id = (select id from auth.users where lower(email) = lower('beatriz@admin.
 drop policy if exists "Users read their own profile" on public.user_profiles;
 create policy "Users read their own profile" on public.user_profiles
   for select to authenticated using (id = (select auth.uid()));
+
+drop policy if exists "Authenticated users read activity logs" on public.activity_logs;
+create policy "Authenticated users read activity logs" on public.activity_logs
+  for select to authenticated using (true);
+drop policy if exists "Admins insert activity logs" on public.activity_logs;
+create policy "Admins insert activity logs" on public.activity_logs
+  for insert to authenticated with check (public.is_system_admin() and actor_id = (select auth.uid()));
 
 drop policy if exists "Authenticated users view shared clients" on public.clients;
 create policy "Authenticated users view shared clients" on public.clients

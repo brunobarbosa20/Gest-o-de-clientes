@@ -609,6 +609,40 @@ body[data-theme="dark"] .nav__items,
 
 .section-block__header { margin-bottom: 10px; }
 
+.activities-section { margin-top: 26px; }
+.activities-list { display: flex; flex-direction: column; }
+.activity-item {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  align-items: start;
+  gap: 12px;
+  padding: 13px 0;
+  border-bottom: 1px solid var(--cor-borda);
+}
+.activity-item:last-child { border-bottom: 0; }
+.activity-item__icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--cor-acento-clara);
+  color: var(--cor-acento);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+.activity-item__content { min-width: 0; }
+.activity-item__heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px 16px;
+  flex-wrap: wrap;
+}
+.activity-item__heading strong { font-size: 0.92rem; }
+.activity-item__time { color: var(--cor-texto-suave); font-size: 0.76rem; }
+.activity-item__details { color: var(--cor-texto-suave); font-size: 0.84rem; overflow-wrap: anywhere; }
+
 .pending-header__total {
   flex-shrink: 0;
   color: var(--cor-perigo);

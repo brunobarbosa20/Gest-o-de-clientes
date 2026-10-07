@@ -1,6 +1,6 @@
 # Configuração do Supabase
 
-1. No Supabase, abra **SQL Editor** e execute o conteúdo atualizado de `supabase/schema.sql`. Isso promove a conta Beatriz já existente a administradora, configura novas contas como visualizadoras e libera a leitura compartilhada do sistema. O script também atualiza as políticas e funções existentes; ele não cria contas nem altera senhas.
+1. No Supabase, abra **SQL Editor** e execute o conteúdo atualizado de `supabase/schema.sql`. Isso promove a conta Beatriz já existente a administradora, configura novas contas como visualizadoras, libera a leitura compartilhada do sistema e cria o registro de atividades recentes. Reexecute esse script ao atualizar a aplicação; ele não importa atividades antigas nem cria contas ou altera senhas.
 2. Em **Project Settings > API**, copie a chave **publishable** (ou a chave legada `anon`) para `anonKey` em `js/supabase-config.js`. A Project URL já está preenchida.
 3. Em **Authentication > Users**, confirme que a conta `beatriz@admin.com` existe. O script promove essa conta a administradora. Em **User Metadata**, o nome pode ser definido como `display_name: Beatriz`; sem esse campo, a saudação usa a parte do e-mail antes de `@`.
 4. Para criar contas de consulta, adicione usuários em **Authentication > Users**. O trigger atribui automaticamente o papel `viewer`; eles compartilham os mesmos dados, mas não podem inserir, editar, excluir ou registrar pagamentos. Não promova outras contas a `admin` sem necessidade.
